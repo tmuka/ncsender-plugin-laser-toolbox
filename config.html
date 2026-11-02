@@ -128,7 +128,7 @@
           <h3 class="lt-card-title">Your laser</h3>
           <div class="lt-row">
             <div class="lt-field"><label for="lt-name">Name</label><input class="lt-input lt-text" id="lt-name" value="K60" title="The laser module's name, used in program headers."></div>
-            <div class="lt-field"><label for="lt-modes">Power modes</label><input class="lt-input lt-text" id="lt-modes" value="20 W, 40 W, 60 W" title="Power modes the module is switched between by hand, separated by commas (the LaserTree K60 has 20, 40 and 60 W). Programs name the mode and pause so you can set it. Blank if it has none."></div>
+            <div class="lt-field"><label for="lt-modes">Power modes</label><input class="lt-input lt-text" id="lt-modes" value="20 W, 40 W, 60 W" title="Power modes the module is switched between by hand, separated by commas (the LaserTree K60 has 20, 40 and 60 W). Programs name the mode to set. Blank if it has none."></div>
             <div class="lt-field"><label for="lt-module-out">Module power</label>
               <select class="lt-select" id="lt-module-out" title="How the module's power (and so its crosshair) is switched. A relay on Mist (M7), Flood (M8) or an aux output lets programs and the buttons here turn it on and off."></select></div>
             <div class="lt-field"><label for="lt-module-delay">Power-on wait (s)</label><input class="lt-input" id="lt-module-delay" value="2" title="Seconds to wait after powering the module before it fires."></div>
@@ -206,7 +206,7 @@
           <h3 class="lt-card-title">For every test</h3>
           <div class="lt-row">
             <div class="lt-field"><label for="lt-material">Material</label><input class="lt-input lt-text" id="lt-material" value="Plywood 3 mm" title="What you're testing on, kept with a preset."></div>
-            <div class="lt-field"><label for="lt-mode">Power mode</label><select class="lt-select" id="lt-mode" title="The module's power mode for this test. The program pauses before burning so you can set it."></select></div>
+            <div class="lt-field"><label for="lt-mode">Power mode</label><select class="lt-select" id="lt-mode" title="The module's power mode for this test: set it on the module before running. The program's header names it."></select></div>
             <div class="lt-field"><label class="lt-check"><input type="checkbox" id="lt-use-focus"> Move to focus Z</label><input class="lt-input" id="lt-focus-z" value="0" title="Work Z the laser is in focus at (from the focus test). Off: the program leaves Z where it is."></div>
             <div class="lt-field"><label class="lt-check"><input type="checkbox" id="lt-use-air" checked> Air assist</label></div>
             <div class="lt-field"><label class="lt-check"><input type="checkbox" id="lt-use-module" checked> Power the module</label></div>
@@ -314,7 +314,7 @@
             <li><strong>Material:</strong> power across, feed up the side. For engraving, pick the cell with the shade you want, fastest first. For scoring, the cleanest line.</li>
             <li><strong>Focus:</strong> the same line at stepped heights. The thinnest line is in focus; keep that Z (and Z0 where it was) for real jobs.</li>
             <li><strong>Cut-through:</strong> at full power, rows of feed and columns of passes. The first cut that drops through is the setting; a little slower for margin.</li>
-            <li>Every program pauses before the first burn to name the power mode to set by hand (the K60&rsquo;s 20, 40 or 60 W), fires only on cutting moves with <code>M4</code>, and needs grblHAL&rsquo;s laser mode (<code>$32=1</code>) on.</li>
+            <li>Every program names the power mode to set by hand (the K60&rsquo;s 20, 40 or 60 W) in its header, and Laser Toolbox says it when the program loads. It fires only on cutting moves with <code>M4</code>, and needs grblHAL&rsquo;s laser mode (<code>$32=1</code>) on.</li>
           </ul>
         </div>
         <div class="lt-card">
@@ -715,8 +715,9 @@ if (typeof module !== 'undefined' && module.exports) {
 //
 // Each program fires only on G1 moves under M4 (dynamic power: off while
 // not moving, and with grblHAL's laser mode, $32=1, off on G0 rapids too),
-// moves Z only on G0 rapids, and pauses with M0 before the first burn when
-// the laser has a power mode to set by hand. It never selects a spindle:
+// moves Z only on G0 rapids, and names the power mode to set by hand in its
+// header (no M0: ncSender shows no prompt for it, so a pause would only look
+// stuck; the dialog says it when the program loads). It never selects a spindle:
 // selecting the laser while it's selected makes grblHAL's offset plugin move
 // the head back (see offsets.cjs), so that's the operator's (or the Switch
 // buttons') job. needs: textStrokes/textWidth (stroke-font.cjs).
@@ -751,6 +752,7 @@ function ltOutput(out, on) {
 function ltStart(o) {
   var L = [ltComment('Laser Toolbox: ' + o.title)];
   L.push(ltComment((o.laserName || 'Laser') + (o.powerMode ? ', power mode ' + o.powerMode : '') + ', S0-' + o.sMax + ' = 0-100%'));
+  if (o.powerMode) L.push(ltComment('Set the ' + (o.laserName || 'laser') + ' to its ' + o.powerMode + ' power mode before running this'));
   (o.notes || []).forEach(function(n) { L.push(ltComment(n)); });
   L.push(ltComment('Select the laser and turn on Laser Mode ($32=1) before running this'));
   L.push('G21 G90 G17');
@@ -759,10 +761,6 @@ function ltStart(o) {
     L.push(ltComment('Laser module power on'));
     L.push(mod);
     if (o.module.delay > 0) L.push('G4 P' + ltFmt(o.module.delay));
-  }
-  if (o.powerMode) {
-    L.push(ltComment('Set the ' + (o.laserName || 'laser') + ' to its ' + o.powerMode + ' power mode, then press Cycle Start'));
-    L.push('M0');
   }
   if (typeof o.focusZ === 'number' && isFinite(o.focusZ)) L.push('G0 Z' + ltF3(o.focusZ));
   L.push('M4 S0');
@@ -1043,7 +1041,8 @@ if (typeof module !== 'undefined' && module.exports) {
         body: JSON.stringify({ filename: name, content: lines.join('\n') + '\n' }) });
       if (!res.ok) throw new Error('ncSender answered ' + res.status);
       note.setAttribute('data-state', 'ok');
-      note.textContent = 'Loaded ' + name + '.';
+      var mode = $('lt-mode').value;
+      note.textContent = 'Loaded ' + name + '.' + (mode ? ' Set the ' + (cfg.name || 'laser') + ' to ' + mode + ' before you run it.' : '');
       setTimeout(function() { window.postMessage({ type: 'close-plugin-dialog' }, '*'); }, 150);
     } catch (e) {
       note.setAttribute('data-state', 'bad');

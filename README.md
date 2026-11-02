@@ -11,7 +11,7 @@ The **Setup** tab reads what grblHAL and ncSender have (without sending anything
 - **A laser spindle:** a PWM spindle that can run a laser. Beside a VFD spindle that's a second spindle (`$511` = PWM2); `M104 Q1` selects it, `M104 Q0` the VFD. Its power range comes from `$730` (PWM2) or `$30` (PWM).
 - **Laser mode** (`$32=1`): with it off, `M4` keeps the beam on during rapids. ncSender Pro's Laser Mode switch sets it; Laser Toolbox won't make a program until it's on.
 - **The offset:** grblHAL's spindle offset plugin keeps the laser's offset from the spindle in `$770` (X) and `$771` (Y). `$772=1` (Update G92 on spindle change) keeps X0 Y0 where it was when you switch, so a laser program lands where the same program would with the spindle.
-- **Your laser:** its name, its **power modes** (switched by hand on the module, like the K60's 20 / 40 / 60 W: every program names the mode and pauses so you can set it), how its **power** is switched (by hand, or a relay on Mist, Flood or an aux output: then the crosshair can be switched too), and the **air assist** output.
+- **Your laser:** its name, its **power modes** (switched by hand on the module, like the K60's 20 / 40 / 60 W: every program names the mode to set, in its header and when it loads; no `M0` pause, since ncSender shows no prompt for one), how its **power** is switched (by hand, or a relay on Mist, Flood or an aux output: then the crosshair can be switched too), and the **air assist** output.
 
 ## Offsets
 
@@ -30,7 +30,7 @@ The offset is the machine position with the laser over the mark less that with t
 
 ## Tests
 
-X0 Y0 is the front-left corner of every test. Each program pauses before the first burn to name the power mode, fires only on cutting moves under `M4`, moves Z only with the laser off, and turns air assist and the module on and off if they're on outputs. Labels are burned in a single-stroke font.
+X0 Y0 is the front-left corner of every test. Each program names the power mode to set, fires only on cutting moves under `M4`, moves Z only with the laser off, and turns air assist and the module on and off if they're on outputs. Labels are burned in a single-stroke font.
 
 - **Material grid:** power across, feed up the side; cells filled (engraving, at a line interval) or outlined (scoring).
 - **Focus ladder:** the same line at a row of heights, each labelled with its Z. The thinnest line is in focus.

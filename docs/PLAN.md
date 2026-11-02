@@ -84,8 +84,8 @@ Pure math in `lib/offsets.cjs`, with the sign convention fixed against `offset.c
 
 ### Tab 3: Tests (G-code generators in `lib/tests.cjs`)
 
-Common card: laser profile and **power mode** (the program's header names it and pauses with `M0` and a
-comment: "Set the K60 to 40 W, then Cycle Start"), material name, test area origin (X0 Y0 at its front-left),
+Common card: laser profile and **power mode** (the program's header names it, and the dialog says it when the program
+loads; no `M0`, since ncSender shows no prompt for one, so a pause only looks stuck), material name, test area origin (X0 Y0 at its front-left),
 air assist, module power, focus height. Every program: `M4 S<n>` only while cutting, `S0`/G0 between, the
 laser spindle selected first if needed, `M5` and outputs off at the end, labels in a single-stroke font.
 

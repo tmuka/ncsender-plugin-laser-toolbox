@@ -24,12 +24,12 @@ function safety(name, prog) {
     });
     assert.ok(!r.end.m4, 'ends with the laser off');
   });
-  test(name + ': pauses for the power mode before the first burn, M30 last, module and air off', () => {
+  test(name + ': names the power mode, no M0 (ncSender shows no prompt), M30 last, module and air off', () => {
     const r = simulate(prog.lines);
     const firstBurn = r.moves.find((m) => m.fire).n;
-    const pause = r.events.find((e) => e.type === 'pause');
-    assert.ok(pause && pause.n < firstBurn);
-    assert.ok(r.events.find((e) => e.type === 'M8').n < pause.n, 'module powered before the pause');
+    assert.ok(!r.events.some((e) => e.type === 'pause'));
+    assert.ok(prog.lines.some((l) => /40 W power mode before running/.test(l)));
+    assert.ok(r.events.find((e) => e.type === 'M8').n < firstBurn, 'module powered before burning');
     assert.strictEqual(prog.lines[prog.lines.length - 1], 'M30');
     assert.ok(prog.lines.includes('M9'));
     assert.ok(!prog.lines.some((l) => /^M104/.test(l)), 'never selects a spindle');
@@ -78,9 +78,9 @@ test('cut-through: n passes in column n, each lower by zStep, back and forth', (
     passes.forEach((m, k) => { assert.ok(Math.abs(m.to.z + 0.5 * k) < 1e-9); assert.strictEqual(m.f, cell.feed); assert.strictEqual(m.s, 1000); });
   });
 });
-test('no power mode: no pause; no outputs: no M7/M8/M9', () => {
+test('no power mode: not named; no outputs: no M7/M8/M9', () => {
   const g = T.materialGrid({ sMax: 1000 }, { powers: [20], feeds: [1000], cell: 5, gap: 1, mode: 'outline', interval: 0.2, textH: 3, labelPower: 20, labelFeed: 1000 });
-  assert.ok(!g.lines.includes('M0'));
+  assert.ok(!g.lines.some((l) => /power mode/.test(l)));
   assert.ok(!g.lines.some((l) => /^M[789]$/.test(l)));
 });
 test('aux outputs use M64/M65', () => {

@@ -23,8 +23,8 @@ mark) − MPos(spindle over it); go to Safe Z before switching; programs never s
 
 ## Testing
 
-`npm test` (inline check, a G-code simulator in `tests/sim.cjs`: no firing on rapids, Z only on rapids, M0 before the
-first burn, no M104; the offset math against offset.c; the setup reading with the Pi's firmware in
+`npm test` (inline check, a G-code simulator in `tests/sim.cjs`: no firing on rapids, Z only on rapids, the power mode
+named and no M0 (ncSender shows no prompt for it), no M104; the offset math against offset.c; the setup reading with the Pi's firmware in
 `tests/fixture-firmware.json`). UI: the test kit (`~/Documents/projects/ncsender-plugin-testkit`),
 `openLocal({ config: 'config.html', pluginId: 'com.tmuka.laser-toolbox', settings: {} })`, `audit(page,
 '.lt-tab:not([hidden])', '.lt-field')`; pass `api` to mock the machine for the calibration flow.
