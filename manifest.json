@@ -1,0 +1,28 @@
+{
+  "id": "com.tmuka.laser-toolbox",
+  "name": "Laser Toolbox",
+  "version": "0.1.0",
+  "minAppVersion": "2.0.88",
+  "configUi": "config.html",
+  "icon": "icon.png",
+  "author": "tmuka",
+  "repository": "https://github.com/tmuka/ncsender-plugin-laser-toolbox",
+  "description": "Laser basics for a grblHAL router with a laser module beside the spindle: check the laser setup, calibrate the spindle-to-laser offset (grblHAL $770/$771) and the crosshair (positioning laser) offset, zero on the stock with the crosshair, and run material, focus and cut-through tests to find power, feed and focus.",
+  "category": "utility",
+  "platforms": {
+    "v2": "2.0.88",
+    "pro-v2": "2.0.149"
+  },
+  "events": [],
+  "permissions": [
+    "gcode.modify"
+  ],
+  "toolMenu": [
+    {
+      "id": "open-config",
+      "label": "Laser Toolbox",
+      "icon": "icon.png",
+      "clientOnly": true
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+ "firmwareVersion": "1.1f.20261015:",
+ "settings": [
+  {
+   "id": 9,
+   "name": "PWM spindle options",
+   "value": "1",
+   "format": "Enable,RPM controls spindle enable signal,Disable laser mode capability,Enable ramping,Ignore on/off delays"
+  },
+  {
+   "id": 30,
+   "name": "Maximum spindle speed",
+   "value": "24000.000",
+   "format": "#####0.000"
+  },
+  {
+   "id": 31,
+   "name": "Minimum spindle speed",
+   "value": "1000.000",
+   "format": "#####0.000"
+  },
+  {
+   "id": 32,
+   "name": "Mode of operation",
+   "value": "0",
+   "format": "Normal,Laser mode,Lathe mode"
+  },
+  {
+   "id": 395,
+   "name": "Default spindle",
+   "value": "2",
+   "format": "PWM,PWM2,Huanyang v1,Huanyang P2A,Durapulse GS20,Yalang YS620,MODVFD,H-100,Nowforever"
+  },
+  {
+   "id": 511,
+   "name": "Spindle 2",
+   "value": "2",
+   "format": "Disabled,PWM,PWM2,Huanyang v1,Huanyang P2A,Durapulse GS20,Yalang YS620,MODVFD,H-100,Nowforever"
+  },
+  {
+   "id": 512,
+   "name": "Spindle 3",
+   "value": "0",
+   "format": "Disabled,PWM,PWM2,Huanyang v1,Huanyang P2A,Durapulse GS20,Yalang YS620,MODVFD,H-100,Nowforever"
+  },
+  {
+   "id": 513,
+   "name": "Spindle 4",
+   "value": "0",
+   "format": "Disabled,PWM,PWM2,Huanyang v1,Huanyang P2A,Durapulse GS20,Yalang YS620,MODVFD,H-100,Nowforever"
+  },
+  {
+   "id": 709,
+   "name": "PWM2 spindle options",
+   "value": "1",
+   "format": "Enable,RPM controls spindle enable signal,Disable laser mode capability,Enable ramping,Ignore on/off delays"
+  },
+  {
+   "id": 730,
+   "name": "PWM2 spindle max speed",
+   "value": "1000.000",
+   "format": "#####0.000"
+  },
+  {
+   "id": 731,
+   "name": "PWM2 spindle min speed",
+   "value": "0.000",
+   "format": "#####0.000"
+  },
+  {
+   "id": 770,
+   "name": "Laser X offset",
+   "value": "0.000",
+   "format": "-##0.000"
+  },
+  {
+   "id": 771,
+   "name": "Laser Y offset",
+   "value": "0.000",
+   "format": "-##0.000"
+  },
+  {
+   "id": 772,
+   "name": "Laser offset options",
+   "value": "0",
+   "format": "Keep new position,Update G92 on spindle change"
+  }
+ ]
+}

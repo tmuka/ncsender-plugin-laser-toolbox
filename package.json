@@ -1,0 +1,12 @@
+{
+  "name": "ncsender-plugin-laser-toolbox",
+  "version": "0.1.0",
+  "license": "GPL-3.0-only",
+  "description": "ncSender plugin: laser offsets, crosshair zeroing and material, focus and cut-through tests",
+  "private": true,
+  "scripts": {
+    "test": "node .scripts/inline.cjs --check && node --test tests/*.cjs",
+    "inline": "node .scripts/inline.cjs",
+    "build": "bash .scripts/build.sh"
+  }
+}
