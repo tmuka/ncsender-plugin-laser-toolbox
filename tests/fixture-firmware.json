@@ -8,6 +8,11 @@
    "format": "Enable,RPM controls spindle enable signal,Disable laser mode capability,Enable ramping,Ignore on/off delays"
   },
   {
+   "id": 13,
+   "name": "Report in inches",
+   "value": "0"
+  },
+  {
    "id": 30,
    "name": "Maximum spindle speed",
    "value": "24000.000",
@@ -24,6 +29,11 @@
    "name": "Mode of operation",
    "value": "0",
    "format": "Normal,Laser mode,Lathe mode"
+  },
+  {
+   "id": 384,
+   "name": "Disable G92 persistence",
+   "value": "0"
   },
   {
    "id": 395,

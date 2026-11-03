@@ -267,6 +267,7 @@
               <button type="button" class="lt-btn lt-laser" id="lt-generate">Generate</button>
               <span class="lt-note" id="lt-gen-note"></span>
             </div>
+            <div id="lt-gen-confirm"></div>
           </div>
           <div class="lt-card">
             <svg class="lt-preview" id="lt-preview" viewBox="0 0 100 80" aria-label="Preview of the test"></svg>
@@ -298,6 +299,8 @@
             <li>Switching to the laser (<code>M104 Q1</code> for spindle 1) moves the head by the offset, so the laser lands where the spindle&rsquo;s tip was. Switching back moves it back. The move happens at the current height, so Laser Toolbox goes to Safe Z first.</li>
             <li>With <code>$772=1</code> (Update G92 on spindle change) X0 Y0 stays where it was, so a laser program lands where the same program would with the spindle. With <code>0</code>, work coordinates move by the offset instead.</li>
             <li>Selecting the laser again while it&rsquo;s selected moves the head back (grblHAL counts it as switching away). So Laser Toolbox&rsquo;s programs never select a spindle: select the laser first, with ncSender&rsquo;s Laser Mode or the Switch buttons.</li>
+            <li>grblHAL saves G92 at the end of a program unless <code>$384=1</code>. Turned off with the laser selected, it comes back with the spindle selected but the laser&rsquo;s offset still in G92, so spindle jobs land off by it. Setup offers <code>$384=1</code>; if it happens, <code>G92.1</code> clears it.</li>
+            <li>A laser program needs the laser selected: with the spindle selected, its <code>M4</code> would run the spindle. Laser Toolbox sees which is selected from the G92 shift (with an offset and <code>$772=1</code>), and asks when it can&rsquo;t tell.</li>
           </ul>
         </div>
         <div class="lt-card">
@@ -537,7 +540,10 @@ function analyzeLaser(fw) {
     spindles: spindles,
     laser: laser,
     laserMode: !!S['32'] && lsNum(S['32'].value) === 1,
-    offset: off
+    offset: off,
+    // grblHAL saves G92 at a program's end unless $384=1 (null: no $384).
+    g92Saved: S['384'] ? lsNum(S['384'].value) !== 1 : null,
+    reportInches: !!S['13'] && lsNum(S['13'].value) === 1
   };
 }
 
@@ -569,6 +575,20 @@ function laserSelected(ms, offset) {
   if (near(dx, offset.x) && near(dy, offset.y)) return true;
   if (near(dx, 0) && near(dy, 0)) return false;
   return 'unknown';
+}
+
+// The G92 offset now (WCO - the work offset's origin), X Y, or null.
+function g92Now(ms) {
+  var wco = parseVec(ms && ms.WCO), o = activeWcs(ms).origin;
+  if (wco.x == null || o.x == null) return null;
+  return { x: Math.round((wco.x - o.x) * 1000) / 1000, y: Math.round((wco.y - o.y) * 1000) / 1000 };
+}
+// A G92 offset that isn't the laser's shift: it would move X0 Y0 for both.
+function strayG92(ms, offset) {
+  var g = g92Now(ms);
+  if (!g || (Math.abs(g.x) < 0.01 && Math.abs(g.y) < 0.01)) return null;
+  if (offset && offset.updateG92 && Math.abs(g.x - offset.x) < 0.01 && Math.abs(g.y - offset.y) < 0.01) return null;
+  return g;
 }
 
 // The setup checklist: { id, level: 'ok' | 'warn' | 'bad' | 'info', title, detail }.
@@ -608,6 +628,12 @@ function setupChecks(info, ncs, ms) {
       o.updateG92 ? 'grblHAL keeps X0 Y0 where it was when it switches, so a program lands where the spindle’s would.'
         : 'With "Keep new position", work coordinates move by the offset when you switch to the laser. Set $772=1 (Update G92 on spindle change).');
   }
+  if (o.available && (o.x || o.y) && o.updateG92 && info.g92Saved === true) {
+    add('g92save', 'warn', 'G92 is kept through a power cycle ($384=0)', 'grblHAL saves G92 at the end of every program. Turned off with the laser selected, it comes back with the spindle selected but the laser\u2019s offset still in G92, so spindle jobs land off by it. Set $384=1 (Disable G92 persistence). If it happens, G92.1 clears it.');
+  }
+  if (info.reportInches) add('inches', 'warn', 'Positions reported in inches ($13=1)', 'ncSender and Laser Toolbox expect mm ($13=0); the offsets would be read wrong.');
+  var stray = strayG92(ms, o);
+  if (stray) add('strayg92', 'warn', 'A G92 offset is active (X ' + stray.x + ', Y ' + stray.y + ')', 'It moves X0 Y0 for the spindle and the laser. G92.1 clears it (the laser\u2019s own shift, with $772=1, is fine).');
   add('homed', ms.homed ? 'ok' : 'warn', ms.homed ? 'Homed' : 'Not homed', ms.homed ? '' : 'Home first: offsets and crosshair zeroing use machine coordinates.');
   var sel = laserSelected(ms, o);
   if (sel !== 'unknown') add('selected', 'info', sel ? 'The laser is selected' : 'The spindle is selected', '');
@@ -616,12 +642,14 @@ function setupChecks(info, ncs, ms) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { fwSettings: fwSettings, analyzeLaser: analyzeLaser, parseVec: parseVec, activeWcs: activeWcs,
-    laserSelected: laserSelected, setupChecks: setupChecks };
+    laserSelected: laserSelected, setupChecks: setupChecks, g92Now: g92Now, strayG92: strayG92 };
 }
 /* END lib/laser-setup.cjs */
 /* BEGIN lib/offsets.cjs */
 // The offsets between the spindle, the laser and its crosshair, in machine
-// mm (raw MPos, as /api/server-state reports it).
+// mm (raw MPos, as /api/server-state reports it). Every command starts with
+// G21: ncSender leaves the controller in G20 for imperial users, and these
+// numbers are mm (the dialog sends G20 back after them).
 //
 // grblHAL's spindle offset plugin (Plugins_spindle/offset.c) stores one
 // offset in $770/$771: switching to the (non-default) laser spindle moves
@@ -665,7 +693,7 @@ function spindlePointFromCrosshair(mposCrosshair, crossOff, laserOff) {
 // puts the laser on the same point).
 function zeroAtCrosshairCommand(mposCrosshair, crossOff, laserOff, wcsIndex) {
   var p = spindlePointFromCrosshair(mposCrosshair, crossOff, laserOff);
-  return 'G10 L2 P' + (wcsIndex || 1) + ' X' + ofF3(p.x) + ' Y' + ofF3(p.y);
+  return 'G21 G10 L2 P' + (wcsIndex || 1) + ' X' + ofF3(p.x) + ' Y' + ofF3(p.y);
 }
 // The machine move that puts the crosshair, the laser or the spindle's tip
 // over work zero (wcsOrigin: the work offset's origin in machine X Y, the
@@ -674,7 +702,7 @@ function moveOverZero(wcsOrigin, crossOff, laserOff, which) {
   var x = wcsOrigin.x, y = wcsOrigin.y;
   if (which === 'laser' || which === 'crosshair') { x += laserOff.x; y += laserOff.y; }
   if (which === 'crosshair') { x += crossOff.x; y += crossOff.y; }
-  return 'G53 G0 X' + ofF3(x) + ' Y' + ofF3(y);
+  return 'G21 G53 G0 X' + ofF3(x) + ' Y' + ofF3(y);
 }
 
 // Switching between the spindle and the laser: up to Safe Z first (machine
@@ -683,7 +711,7 @@ function moveOverZero(wcsOrigin, crossOff, laserOff, which) {
 // offset.c then takes the "switching back" branch and moves by -offset.
 function switchCommands(toLaser, laserNum, safeZMachine) {
   var z = typeof safeZMachine === 'number' && isFinite(safeZMachine) ? safeZMachine : 0;
-  return ['G53 G0 Z' + ofF3(z), 'M104 Q' + (toLaser ? laserNum : 0)];
+  return ['G21 G53 G0 Z' + ofF3(z), 'M104 Q' + (toLaser ? laserNum : 0)];
 }
 
 // What grblHAL does on a switch, for the tests: the head's new machine
@@ -762,32 +790,43 @@ function ltStart(o) {
     L.push(mod);
     if (o.module.delay > 0) L.push('G4 P' + ltFmt(o.module.delay));
   }
-  if (typeof o.focusZ === 'number' && isFinite(o.focusZ)) L.push('G0 Z' + ltF3(o.focusZ));
+  if (typeof o.focusZ === 'number' && isFinite(o.focusZ)) L.push('G0 Z' + ltF3(o.focusZ) + ' S0');
   L.push('M4 S0');
   var air = ltOutput(o.air, true);
   if (air && air !== mod) L.push(air);
   return L;
 }
+// The end: laser off, outputs off, G20 back for imperial users, M30. Kept on
+// (the calibration mark, for the crosshair): a module on Mist or Flood also
+// skips M30, which turns both off.
 function ltEnd(o, L) {
   L.push('M5 S0');
-  var air = ltOutput(o.air, false), mod = o.module && !o.keepModuleOn ? ltOutput(o.module.out, false) : null;
-  if (air) L.push(air);
+  var keep = o.keepModuleOn && o.module && o.module.out;
+  var air = ltOutput(o.air, false), mod = o.module && !keep ? ltOutput(o.module.out, false) : null;
+  if (air && !(keep && air === 'M9')) L.push(air);
   if (mod && mod !== air) L.push(mod);
+  if (o.imperial) L.push('G20');
+  if (keep && (o.module.out === 'M7' || o.module.out === 'M8')) { L.push(ltComment('The module stays on for the crosshair')); return L; }
   L.push('M30');
   return L;
 }
 // Burns groups of paths: each group { comment, power (%), feed, z (work Z or
-// undefined), paths: [[{x,y}...]] }. G0 to each path's start, then G1.
-// machine: prefix every move with G53 (the calibration mark).
+// undefined), paths: [[{x,y}...]] }. G0 to each path's start (S0, so a rapid
+// stays dark even run without laser mode), then G1. A new Z: up before moving
+// across, down only after. machine: prefix every move with G53 (the mark).
 function ltBurn(o, L, groups, machine) {
   var pre = machine ? 'G53 ' : '', z = null;
   groups.forEach(function(g) {
     if (g.comment) L.push(ltComment(g.comment));
-    var s = ltS(g.power, o.sMax), f = Math.round(g.feed);
-    if (typeof g.z === 'number' && g.z !== z) { L.push('G0 Z' + ltF3(g.z)); z = g.z; }
+    var s = ltS(g.power, o.sMax), f = Math.round(g.feed), down = null;
+    if (typeof g.z === 'number' && g.z !== z) {
+      if (z != null && g.z < z) down = g.z;
+      else { L.push('G0 Z' + ltF3(g.z) + ' S0'); z = g.z; }
+    }
     g.paths.forEach(function(p) {
       if (p.length < 2) return;
-      L.push(pre + 'G0 X' + ltF3(p[0].x) + ' Y' + ltF3(p[0].y));
+      L.push(pre + 'G0 X' + ltF3(p[0].x) + ' Y' + ltF3(p[0].y) + ' S0');
+      if (down != null) { L.push('G0 Z' + ltF3(down) + ' S0'); z = down; down = null; }
       for (var i = 1; i < p.length; i++) {
         L.push(pre + 'G1 X' + ltF3(p[i].x) + ' Y' + ltF3(p[i].y) + (i === 1 ? ' F' + f + ' S' + s : ''));
       }
@@ -863,13 +902,14 @@ function materialGrid(o, p) {
 
 // Focus ladder: a line along X at each Z, labelled with its Z; the thinnest
 // line is in focus. p: { zs: [work Z], length, spacing, power, feed, textH,
-// labelPower, labelFeed, labelZ }. The lines run front to back in the order
-// of zs; Z moves happen between lines, with the laser off.
+// labelPower, labelFeed, labelZ }. The lines sit front to back in the order
+// of zs and burn from the highest Z down, so each Z move is down, after the
+// rapid to its line (with the laser off).
 function focusLadder(o, p) {
   var h = p.textH, pad = 2, groups = [], rows = [];
   var left = Math.max.apply(null, p.zs.map(function(z) { return textWidth('Z' + ltFmt(z), h); })) + pad + 1;
-  p.zs.forEach(function(z, i) {
-    var y = i * p.spacing + h / 2;
+  p.zs.map(function(z, i) { return { z: z, i: i }; }).sort(function(a, b) { return b.z - a.z; }).forEach(function(r) {
+    var z = r.z, i = r.i, y = i * p.spacing + h / 2;
     rows.push({ index: i, z: z, y: y });
     groups.push({ comment: 'Line ' + (i + 1) + ' at Z' + ltFmt(z), power: p.power, feed: p.feed, z: z,
       paths: [[{ x: left, y: y }, { x: left + p.length, y: y }]] });
@@ -928,9 +968,9 @@ function calibrationMark(o, p) {
   var a = p.size / 2, cx = p.x, cy = p.y;
   var groups = [{ comment: 'A cross centered where the laser is now', power: p.power, feed: p.feed,
     paths: [[{ x: cx - a, y: cy }, { x: cx + a, y: cy }], [{ x: cx, y: cy - a }, { x: cx, y: cy + a }]] }];
-  var oo = Object.assign({}, o, { focusZ: null, keepModuleOn: true, title: 'calibration mark, a ' + ltFmt(p.size) + ' mm cross at machine X' + ltF3(cx) + ' Y' + ltF3(cy) });
+  var oo = Object.assign({}, o, { focusZ: null, air: '', keepModuleOn: true, title: 'calibration mark, a ' + ltFmt(p.size) + ' mm cross at machine X' + ltF3(cx) + ' Y' + ltF3(cy) });
   var L = ltBurn(o, ltStart(oo), groups, true);
-  L.push('G53 G0 X' + ltF3(cx) + ' Y' + ltF3(cy));
+  L.push('G53 G0 X' + ltF3(cx) + ' Y' + ltF3(cy) + ' S0');
   return { lines: ltEnd(oo, L), groups: groups, box: ltBox(groups) };
 }
 // The check: a cross on work X0 Y0, burned with the laser. With the offset
@@ -941,7 +981,7 @@ function checkCross(o, p) {
     paths: [[{ x: -a, y: 0 }, { x: a, y: 0 }], [{ x: 0, y: -a }, { x: 0, y: a }]] }];
   var oo = Object.assign({}, o, { title: 'offset check, a ' + ltFmt(p.size) + ' mm cross on X0 Y0' });
   var L = ltBurn(o, ltStart(oo), groups);
-  L.push('G0 X0 Y0');
+  L.push('G0 X0 Y0 S0');
   return { lines: ltEnd(oo, L), groups: groups, box: ltBox(groups) };
 }
 
@@ -1042,8 +1082,13 @@ if (typeof module !== 'undefined' && module.exports) {
       if (!res.ok) throw new Error('ncSender answered ' + res.status);
       note.setAttribute('data-state', 'ok');
       var mode = $('lt-mode').value;
-      note.textContent = 'Loaded ' + name + '.' + (mode ? ' Set the ' + (cfg.name || 'laser') + ' to ' + mode + ' before you run it.' : '');
-      setTimeout(function() { window.postMessage({ type: 'close-plugin-dialog' }, '*'); }, 150);
+      // With a power mode to set, the dialog stays open so the reminder is seen.
+      if (!mode) { note.textContent = 'Loaded ' + name + '.'; setTimeout(function() { window.postMessage({ type: 'close-plugin-dialog' }, '*'); }, 150); return; }
+      note.textContent = 'Loaded ' + name + '. Set the ' + (cfg.name || 'laser') + ' to ' + mode + ' before you run it. ';
+      var close = document.createElement('button');
+      close.type = 'button'; close.className = 'lt-btn lt-ghost'; close.textContent = 'Done, close';
+      close.addEventListener('click', function() { window.postMessage({ type: 'close-plugin-dialog' }, '*'); });
+      note.appendChild(close);
     } catch (e) {
       note.setAttribute('data-state', 'bad');
       note.textContent = 'Couldn’t load it: ' + e.message + '.';
@@ -1051,26 +1096,52 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   // An inline "this sends ..." box: nothing reaches the controller until Send.
-  function confirmSend(holder, title, commands, done) {
+  // commands: a list, or a function that builds it from the state read at
+  // Send. precheck: an async function giving a reason not to send, read at
+  // Send too (the machine may have changed since the box opened). Commands in
+  // mm (G21) are followed by G20 for imperial users, as ncSender keeps it.
+  function confirmSend(holder, title, commands, done, precheck) {
     holder.innerHTML = '';
+    var build = typeof commands === 'function' ? commands : function() { return commands; };
     var box = document.createElement('div');
     box.className = 'lt-confirm';
     box.innerHTML = '<strong></strong><pre></pre><div class="lt-actions"><button type="button" class="lt-btn">Send</button><button type="button" class="lt-btn lt-ghost">Cancel</button><span class="lt-note"></span></div>';
     box.querySelector('strong').textContent = title;
-    box.querySelector('pre').textContent = commands.join('\n');
+    box.querySelector('pre').textContent = build().join('\n');
     var btns = box.querySelectorAll('button'), note = box.querySelector('.lt-note');
     btns[1].addEventListener('click', function() { holder.innerHTML = ''; });
     btns[0].addEventListener('click', async function() {
       await readState();
       if (!idle()) { note.setAttribute('data-state', 'bad'); note.textContent = 'Only while the machine is idle.'; return; }
+      var why = precheck ? await precheck() : null;
+      if (why) { note.setAttribute('data-state', 'bad'); note.textContent = why; return; }
       btns[0].disabled = true;
-      var ok = true;
-      for (var i = 0; i < commands.length && ok; i++) ok = await sendCommand(commands[i]);
+      var ok = true, list = build();
+      box.querySelector('pre').textContent = list.join('\n');
+      for (var i = 0; i < list.length && ok; i++) ok = await sendCommand(list[i]);
+      if (ok && imperial() && list.some(function(c) { return /^G21\b/.test(c); })) ok = await sendCommand('G20');
       note.setAttribute('data-state', ok ? 'ok' : 'bad');
       note.textContent = ok ? 'Sent.' : 'ncSender didn’t take it.';
       setTimeout(function() { if (ok) holder.innerHTML = ''; if (done) done(ok); }, ok ? 700 : 0);
     });
     holder.appendChild(box);
+  }
+
+  function imperial() { return String(st.ncs.unitsPreference || '').toLowerCase() === 'imperial'; }
+  // A yes / no question in a box; resolves true on Yes.
+  function askYes(holder, text, yes) {
+    return new Promise(function(resolve) {
+      holder.innerHTML = '';
+      var box = document.createElement('div');
+      box.className = 'lt-confirm';
+      box.innerHTML = '<strong></strong><div class="lt-actions"><button type="button" class="lt-btn"></button><button type="button" class="lt-btn lt-ghost">Cancel</button></div>';
+      box.querySelector('strong').textContent = text;
+      var b = box.querySelectorAll('button');
+      b[0].textContent = yes;
+      b[0].addEventListener('click', function() { holder.innerHTML = ''; resolve(true); });
+      b[1].addEventListener('click', function() { holder.innerHTML = ''; resolve(false); });
+      holder.appendChild(box);
+    });
   }
 
   // ---------- Setup ----------
@@ -1109,7 +1180,13 @@ if (typeof module !== 'undefined' && module.exports) {
       fixes.appendChild(b);
     };
     if (st.info.laser && !st.info.laserMode && !('laserSpindle' in st.ncs)) addFix('Turn on laser mode ($32=1)', 'Turn on grblHAL’s laser mode:', ['$32=1']);
-    if (st.info.offset.available && !st.info.offset.updateG92) addFix('Keep X0 Y0 on a switch ($772=1)', 'Keep work coordinates when switching to the laser:', ['$772=1']);
+    if (st.info.offset.available && !st.info.offset.updateG92) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'lt-btn lt-ghost'; b.textContent = 'Keep X0 Y0 on a switch ($772=1)';
+      b.addEventListener('click', function() { offsetChange($('lt-setup-confirm'), 'Keep work coordinates when switching to the laser:', function() { return ['$772=1']; }, function() { refresh(); }); });
+      fixes.appendChild(b);
+    }
+    if (setupChecks(st.info, st.ncs, st.ms).some(function(c) { return c.id === 'g92save'; })) addFix('Don\u2019t keep G92 through a power cycle ($384=1)', 'Stop grblHAL saving G92 at the end of a program:', ['$384=1']);
   }
   async function refresh() {
     await readAll();
@@ -1125,7 +1202,9 @@ if (typeof module !== 'undefined' && module.exports) {
     var sel = st.info ? laserSelected(st.ms, o) : 'unknown';
     $('lt-selected').textContent = sel === true ? 'The laser is selected.' : sel === false ? 'The spindle is selected.' : '';
     $('lt-cross-offset').textContent = cfg.crossOff ? 'X ' + fmt3(cfg.crossOff.x) + '  Y ' + fmt3(cfg.crossOff.y) + ' mm from the beam' : 'Not measured yet';
-    $('lt-mark-note').textContent = cfg.mark ? 'Mark at machine X ' + fmt3(cfg.mark.x) + ' Y ' + fmt3(cfg.mark.y) + '.' : '';
+    var age = cfg.mark && cfg.mark.t ? Math.round((Date.now() - cfg.mark.t) / 60000) : null;
+    $('lt-mark-note').textContent = cfg.mark ? 'Mark at machine X ' + fmt3(cfg.mark.x) + ' Y ' + fmt3(cfg.mark.y) +
+      (age == null ? '' : age < 1 ? ', burned just now' : age < 120 ? ', burned ' + age + ' min ago' : ', burned ' + Math.round(age / 60) + ' h ago: burn a new one if the stock or the bracket moved') + '.' : '';
     var n = $('lt-new-offset');
     if (cfg.mark && cfg.spindleAt) {
       var off = laserOffset(cfg.mark, cfg.spindleAt);
@@ -1141,7 +1220,7 @@ if (typeof module !== 'undefined' && module.exports) {
       [['Module on', true], ['Module off', false]].forEach(function(p) {
         var b = document.createElement('button');
         b.type = 'button'; b.className = 'lt-btn lt-ghost'; b.textContent = p[0];
-        b.addEventListener('click', function() { confirmSend($('lt-cross-confirm'), p[0] + ':', [ltOutput(cfg.moduleOut, p[1])]); });
+        b.addEventListener('click', function() { confirmSend($('lt-cross-confirm'), p[0] + (!p[1] && /^M[78]$/.test(cfg.moduleOut) ? ' (M9 turns off Mist and Flood both):' : ':'), [ltOutput(cfg.moduleOut, p[1])]); });
         mb.appendChild(b);
       });
     }
@@ -1155,20 +1234,30 @@ if (typeof module !== 'undefined' && module.exports) {
   function programOptions() {
     return { laserName: cfg.name || 'Laser', powerMode: $('lt-mode').value || '', sMax: (st.info.laser && st.info.laser.sMax) || 1000,
       module: $('lt-use-module').checked && cfg.moduleOut ? { out: cfg.moduleOut, delay: Number(cfg.moduleDelay) || 0 } : null,
-      air: $('lt-use-air').checked ? cfg.airOut : '', rapid: Number(st.ms.maxFeedrate) || 5000 };
+      air: $('lt-use-air').checked ? cfg.airOut : '', rapid: Number(st.ms.maxFeedrate) || 5000, imperial: imperial() };
   }
-  async function laserReady(note) {
+  // A laser program needs the laser selected: with the spindle selected, its
+  // M4 S would run the spindle. Seen from the G92 shift when there's an offset
+  // and $772=1; otherwise asked.
+  async function laserReady(note, holder) {
     if (!st.info.laser) { note.setAttribute('data-state', 'bad'); note.textContent = 'No laser spindle in grblHAL (see Setup).'; return false; }
     if (!(await readLaserModeLive())) { note.setAttribute('data-state', 'bad'); note.textContent = 'Turn on Laser Mode ($32=1) first: with it off, M4 keeps the laser on during rapids.'; return false; }
+    var sel = laserSelected(st.ms, st.info.offset);
+    if (sel === false) { note.setAttribute('data-state', 'bad'); note.textContent = 'The spindle is selected: switch to the laser first (Offsets, or ncSender\u2019s Laser Mode). Its M4 would run the spindle.'; return false; }
+    if (sel === 'unknown') {
+      note.textContent = '';
+      return askYes(holder, 'Is the laser (spindle ' + st.info.laser.num + ') selected? With the spindle selected, the program\u2019s M4 would run the spindle.', 'Yes, the laser is selected');
+    }
     return true;
   }
   async function burnMark() {
     var note = $('lt-mark-note');
     await readState();
-    if (!needHomedIdle(note) || !(await laserReady(note))) return;
+    if (!needHomedIdle(note) || !(await laserReady(note, $('lt-offsets-confirm')))) return;
+    await readState();
     var at = mpos();
     var prog = calibrationMark(programOptions(), { x: at.x, y: at.y, size: val('lt-mark-size', 6), power: val('lt-mark-power', 10), feed: val('lt-mark-feed', 1000) });
-    cfg.mark = { x: at.x, y: at.y }; cfg.spindleAt = null;
+    cfg.mark = { x: at.x, y: at.y, t: Date.now() }; cfg.spindleAt = null;
     save();
     loadProgram('LaserToolbox-mark.nc', prog.lines, note);
   }
@@ -1193,13 +1282,30 @@ if (typeof module !== 'undefined' && module.exports) {
     save();
     renderOffsets();
   }
+  // A G92 offset other than the laser's shift moves X0 Y0: say so first.
+  async function strayCheck() {
+    var g = strayG92(st.ms, st.info.offset);
+    return g ? 'A G92 offset is active (X ' + g.x + ', Y ' + g.y + '); G92.1 clears it.' : null;
+  }
+  // Changing the offset or $772 with the laser selected leaves the switch
+  // back to take away an amount grblHAL never added: only with the spindle.
+  async function offsetChange(holder, title, build, done) {
+    var sel = laserSelected(st.ms, st.info.offset), o = st.info.offset;
+    if (sel === true) { holder.innerHTML = '<p class="lt-note" data-state="bad">Switch to the spindle first: changing this with the laser selected would leave the wrong offset in G92 when you switch back.</p>'; return; }
+    if (sel === 'unknown' && (o.x || o.y) && !(await askYes(holder, 'Is the spindle (not the laser) selected? Changing this with the laser selected would leave the wrong offset in G92.', 'Yes, the spindle'))) return;
+    confirmSend(holder, title, build, done, async function() {
+      return laserSelected(st.ms, st.info.offset) === true ? 'The laser is selected now: switch to the spindle first.' : null;
+    });
+  }
   function laserOff() { return st.info && st.info.offset ? { x: st.info.offset.x, y: st.info.offset.y } : { x: 0, y: 0 }; }
   async function zeroAtCross() {
     var holder = $('lt-cross-confirm');
     await readState();
     if (!cfg.crossOff) { holder.innerHTML = '<p class="lt-note" data-state="warn">Measure the crosshair first.</p>'; return; }
-    var w = activeWcs(st.ms), cmd = zeroAtCrosshairCommand(mpos(), cfg.crossOff, laserOff(), w.index);
-    confirmSend(holder, 'Put ' + w.name + '’s X0 Y0 where the crosshair points:', [cmd], function() { readAll().then(renderOffsets); });
+    var w = activeWcs(st.ms);
+    confirmSend(holder, 'Put ' + w.name + '\u2019s X0 Y0 where the crosshair points (read again at Send):', function() {
+      return [zeroAtCrosshairCommand(mpos(), cfg.crossOff, laserOff(), activeWcs(st.ms).index)];
+    }, function() { readAll().then(renderOffsets); }, strayCheck);
   }
   async function gotoZero(which) {
     var holder = which === 'spindle' ? $('lt-offsets-confirm') : $('lt-cross-confirm');
@@ -1208,8 +1314,8 @@ if (typeof module !== 'undefined' && module.exports) {
     if (w.origin.x == null) { holder.innerHTML = '<p class="lt-note" data-state="bad">ncSender didn’t say where X0 Y0 is.</p>'; return; }
     if (which === 'crosshair' && !cfg.crossOff) { holder.innerHTML = '<p class="lt-note" data-state="warn">Measure the crosshair first.</p>'; return; }
     var z = switchCommands(false, 0, st.safeZ)[0];
-    confirmSend(holder, (which === 'spindle' ? 'The spindle’s tip' : which === 'laser' ? 'The laser' : 'The crosshair') + ' over X0 Y0 (at Safe Z; jog down to look):',
-      [z, moveOverZero(w.origin, cfg.crossOff || { x: 0, y: 0 }, laserOff(), which)]);
+    confirmSend(holder, (which === 'spindle' ? 'The spindle\u2019s tip' : which === 'laser' ? 'The laser' : 'The crosshair') + ' over X0 Y0 (at Safe Z; jog down to look):',
+      [z, moveOverZero(w.origin, cfg.crossOff || { x: 0, y: 0 }, laserOff(), which)], null, strayCheck);
   }
   function switchTo(toLaser) {
     var holder = $('lt-offsets-confirm');
@@ -1217,13 +1323,24 @@ if (typeof module !== 'undefined' && module.exports) {
     var sel = laserSelected(st.ms, st.info.offset);
     if (toLaser && sel === true) { holder.innerHTML = '<p class="lt-note" data-state="warn">The laser is already selected. Selecting it again would move the head back.</p>'; return; }
     if (!toLaser && sel === false) { holder.innerHTML = '<p class="lt-note">The spindle is already selected.</p>'; return; }
+    if (st.switching) { holder.innerHTML = '<p class="lt-note">Waiting for the last switch to show\u2026</p>'; return; }
     confirmSend(holder, toLaser ? 'Switch to the laser (grblHAL moves the head by the offset):' : 'Switch to the spindle (grblHAL moves the head back):',
-      switchCommands(toLaser, st.info.laser.num, st.safeZ), function() { setTimeout(function() { readAll().then(renderOffsets); }, 600); });
+      switchCommands(toLaser, st.info.laser.num, st.safeZ), function(ok) {
+        if (!ok) return;
+        st.switching = true;
+        setTimeout(function() { readAll().then(function() { st.switching = false; renderOffsets(); }); }, 1500);
+      }, async function() {
+        if (st.switching) return 'The last switch hasn\u2019t shown yet.';
+        var now = laserSelected(st.ms, st.info.offset);
+        if (toLaser && now === true) return 'The laser is selected already: selecting it again would move the head back.';
+        if (!toLaser && now === false) return 'The spindle is selected already.';
+        return null;
+      });
   }
   async function checkCrossProgram() {
     var note = $('lt-mark-note');
     await readState();
-    if (!needHomedIdle(note) || !(await laserReady(note))) return;
+    if (!needHomedIdle(note) || !(await laserReady(note, $('lt-offsets-confirm')))) return;
     var prog = checkCross(programOptions(), { size: 10, power: val('lt-mark-power', 10), feed: val('lt-mark-feed', 1000) });
     loadProgram('LaserToolbox-check.nc', prog.lines, note);
   }
@@ -1255,6 +1372,11 @@ if (typeof module !== 'undefined' && module.exports) {
     if (kind === 'focus') return focusLadder(o, testParams('focus'));
     return cutThrough(o, testParams('cut'));
   }
+  function ltBoxOf(g) {
+    var b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+    g.paths.forEach(function(p) { p.forEach(function(q) { b.x0 = Math.min(b.x0, q.x); b.y0 = Math.min(b.y0, q.y); b.x1 = Math.max(b.x1, q.x); b.y1 = Math.max(b.y1, q.y); }); });
+    return b;
+  }
   function drawPreview() {
     var svg = $('lt-preview');
     if (!st.info) return;
@@ -1266,7 +1388,14 @@ if (typeof module !== 'undefined' && module.exports) {
     out.push('<rect class="area" x="' + b.x0 + '" y="' + (-b.y1) + '" width="' + (b.x1 - b.x0) + '" height="' + (b.y1 - b.y0) + '" stroke-width="' + sw + '"/>');
     var maxP = 0;
     t.groups.forEach(function(g) { if (!g.label) maxP = Math.max(maxP, g.power); });
+    // Too many lines to draw on every keystroke: cells as filled boxes.
+    var count = t.groups.reduce(function(n, g) { return n + g.paths.length; }, 0), boxes = count > 20000;
     t.groups.forEach(function(g) {
+      if (boxes && !g.label) {
+        var gb = ltBoxOf(g);
+        out.push('<rect class="burn" x="' + gb.x0 + '" y="' + (-gb.y1) + '" width="' + (gb.x1 - gb.x0) + '" height="' + (gb.y1 - gb.y0) + '" fill="var(--lt-laser)" fill-opacity="' + (0.25 + 0.75 * g.power / (maxP || 1)).toFixed(2) + '" stroke-width="0"/>');
+        return;
+      }
       var d = g.paths.map(function(p) { return 'M' + p.map(function(q) { return q.x.toFixed(2) + ' ' + (-q.y).toFixed(2); }).join('L'); }).join('');
       if (g.label) out.push('<path class="lbl" d="' + d + '" stroke-width="' + (sw * 1.2) + '"/>');
       else out.push('<path class="burn" d="' + d + '" stroke-width="' + (cfg.test === 'grid' && $('lt-g-mode').value === 'fill' ? Math.max(sw, val('lt-g-int', 0.1)) : sw * 2) + '" stroke-opacity="' + (0.25 + 0.75 * g.power / (maxP || 1)).toFixed(2) + '"/>');
@@ -1280,7 +1409,8 @@ if (typeof module !== 'undefined' && module.exports) {
     var note = $('lt-gen-note');
     await readState();
     if (!st.ms.connected) { note.setAttribute('data-state', 'bad'); note.textContent = 'Connect to the controller first.'; return; }
-    if (!(await laserReady(note))) return;
+    if (!idle()) { note.setAttribute('data-state', 'bad'); note.textContent = 'Only while the machine is idle (a running job would pick up the new program).'; return; }
+    if (!(await laserReady(note, $('lt-gen-confirm')))) return;
     var t = buildTest(), name = { grid: 'material-grid', focus: 'focus-ladder', cut: 'cut-through' }[cfg.test];
     loadProgram('LaserToolbox-' + name + '.nc', t.lines, note);
   }
@@ -1346,8 +1476,8 @@ if (typeof module !== 'undefined' && module.exports) {
     ROOT.querySelectorAll('[data-goto]').forEach(function(b) { b.addEventListener('click', function() { gotoZero(b.getAttribute('data-goto')); }); });
     $('lt-write-offset').addEventListener('click', function() {
       var off = laserOffset(cfg.mark, cfg.spindleAt);
-      confirmSend($('lt-offset-confirm'), 'Store the offset in grblHAL (and keep X0 Y0 on a switch):', offsetCommands(off), async function(ok) {
-        if (ok) { await readOffsetLive(); renderOffsets(); renderChecks(); }
+      offsetChange($('lt-offset-confirm'), 'Store the offset in grblHAL (and keep X0 Y0 on a switch):', function() { return offsetCommands(off); }, async function(ok) {
+        if (ok) { cfg.spindleAt = null; save(); await readOffsetLive(); renderOffsets(); renderChecks(); }
       });
     });
     ROOT.querySelectorAll('#lt-test-seg button').forEach(function(b) { b.addEventListener('click', function() { showTest(b.getAttribute('data-test')); }); });

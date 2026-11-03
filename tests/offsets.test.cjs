@@ -49,7 +49,7 @@ test('zero at crosshair: work zero where the spindle\'s tip is over that point, 
   const crossOff = O.crosshairOffset(mposC, mposL), laserOff = O.laserOffset(mposL, mposS);
   const p = O.spindlePointFromCrosshair(mposC, crossOff, laserOff);
   assert.deepStrictEqual(p, mposS);
-  assert.strictEqual(O.zeroAtCrosshairCommand(mposC, crossOff, laserOff, 2), 'G10 L2 P2 X300.000 Y200.000');
+  assert.strictEqual(O.zeroAtCrosshairCommand(mposC, crossOff, laserOff, 2), 'G21 G10 L2 P2 X300.000 Y200.000');
   // With the laser selected ($772=1): G92 = laser offset, so the laser over the
   // point reads work 0: MPos - G54 - G92 = (mposL) - (mposS) - laserOff = 0.
   const wx = mposL.x - p.x - laserOff.x, wy = mposL.y - p.y - laserOff.y;
@@ -57,11 +57,14 @@ test('zero at crosshair: work zero where the spindle\'s tip is over that point, 
 });
 test('moves over work zero for the spindle, the laser and the crosshair', () => {
   const crossOff = { x: -12, y: -8 }, laserOff = { x: -40.5, y: 27.75 }, origin = { x: 300, y: 200 };
-  assert.strictEqual(O.moveOverZero(origin, crossOff, laserOff, 'spindle'), 'G53 G0 X300.000 Y200.000');
-  assert.strictEqual(O.moveOverZero(origin, crossOff, laserOff, 'laser'), 'G53 G0 X259.500 Y227.750');
-  assert.strictEqual(O.moveOverZero(origin, crossOff, laserOff, 'crosshair'), 'G53 G0 X247.500 Y219.750');
+  assert.strictEqual(O.moveOverZero(origin, crossOff, laserOff, 'spindle'), 'G21 G53 G0 X300.000 Y200.000');
+  assert.strictEqual(O.moveOverZero(origin, crossOff, laserOff, 'laser'), 'G21 G53 G0 X259.500 Y227.750');
+  assert.strictEqual(O.moveOverZero(origin, crossOff, laserOff, 'crosshair'), 'G21 G53 G0 X247.500 Y219.750');
 });
 test('switch commands go to Safe Z first', () => {
-  assert.deepStrictEqual(O.switchCommands(true, 1, -5), ['G53 G0 Z-5.000', 'M104 Q1']);
-  assert.deepStrictEqual(O.switchCommands(false, 1, null), ['G53 G0 Z0.000', 'M104 Q0']);
+  assert.deepStrictEqual(O.switchCommands(true, 1, -5), ['G21 G53 G0 Z-5.000', 'M104 Q1']);
+  assert.deepStrictEqual(O.switchCommands(false, 1, null), ['G21 G53 G0 Z0.000', 'M104 Q0']);
+});
+test('every motion command the dialog sends is in mm (G21), whatever ncSender left the controller in', () => {
+  for (const c of [O.zeroAtCrosshairCommand({ x: 1, y: 1 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 1), O.moveOverZero({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 'laser'), O.switchCommands(true, 1, -5)[0]]) assert.match(c, /^G21 /);
 });

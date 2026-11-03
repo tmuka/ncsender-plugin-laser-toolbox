@@ -45,7 +45,9 @@ test('checklist: all set, laser selected seen from the G92 shift', () => {
   assert.strictEqual(S.laserSelected(Object.assign({}, ms, { WCO: '100,300,-10,0' }), i.offset), false);
   assert.strictEqual(S.laserSelected(Object.assign({}, ms, { WCO: '101,300,-10,0' }), i.offset), 'unknown');
   const by = Object.fromEntries(S.setupChecks(i, {}, ms).map((c) => [c.id, c.level]));
-  assert.deepStrictEqual(by, { spindle: 'ok', laserMode: 'ok', ncsender: 'info', offset: 'ok', g92: 'ok', homed: 'ok', selected: 'info' });
+  assert.deepStrictEqual(by, { spindle: 'ok', laserMode: 'ok', ncsender: 'info', offset: 'ok', g92: 'ok', g92save: 'warn', homed: 'ok', selected: 'info' });
+  assert.strictEqual(S.strayG92(ms, i.offset), null, 'the laser\'s own shift is fine');
+  assert.deepStrictEqual(S.strayG92(Object.assign({}, ms, { WCO: '105,300,-10,0' }), i.offset), { x: 5, y: 0 });
 });
 test('active work offset index for G10 L2', () => {
   assert.strictEqual(S.activeWcs({ workspace: 'G54' }).index, 1);

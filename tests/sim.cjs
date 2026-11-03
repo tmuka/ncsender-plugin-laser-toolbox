@@ -2,7 +2,9 @@
 // the laser. Enough of grbl/grblHAL in laser mode ($32=1): M4 is dynamic
 // power, the laser fires only on G1/G2/G3 while M4 is on with S > 0; G0 is
 // always dark.
-function simulate(lines) {
+// laserMode false: grbl without $32=1, where M4 S keeps firing through G0.
+function simulate(lines, laserMode) {
+  if (laserMode === undefined) laserMode = true;
   var st = { motion: null, m4: false, s: 0, f: 0, x: 0, y: 0, z: null, abs: true, paused: false },
     moves = [], events = [];
   lines.forEach(function(raw, n) {
@@ -23,7 +25,7 @@ function simulate(lines) {
     if ('F' in words) st.f = words.F;
     if ('X' in words || 'Y' in words || 'Z' in words) {
       var to = { x: 'X' in words ? words.X : st.x, y: 'Y' in words ? words.Y : st.y, z: 'Z' in words ? words.Z : st.z };
-      var fire = st.motion !== '0' && st.m4 && st.s > 0;
+      var fire = (st.motion !== '0' || !laserMode) && st.m4 && st.s > 0;
       moves.push({ n: n, from: { x: st.x, y: st.y, z: st.z }, to: to, motion: st.motion, fire: fire, s: st.s, f: st.f, g53: g53 });
       st.x = to.x; st.y = to.y; st.z = to.z;
     }

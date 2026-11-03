@@ -24,6 +24,19 @@ function safety(name, prog) {
     });
     assert.ok(!r.end.m4, 'ends with the laser off');
   });
+  test(name + ': rapids stay dark even without laser mode ($32=0): S0 on every G0', () => {
+    const r = simulate(prog.lines, false);
+    r.moves.filter((m) => m.motion === '0').forEach((m) => assert.ok(!m.fire, 'line ' + m.n + ': ' + prog.lines[m.n]));
+  });
+  test(name + ': Z only goes down after the rapid to where it burns next', () => {
+    const r = simulate(prog.lines);
+    r.moves.forEach((m, i) => {
+      if (m.from.z != null && m.to.z < m.from.z) {
+        const next = r.moves.slice(i + 1).find((x) => x.fire);
+        assert.ok(next && next.from.x === m.to.x && next.from.y === m.to.y, 'line ' + m.n + ' lowers Z away from the next burn');
+      }
+    });
+  });
   test(name + ': names the power mode, no M0 (ncSender shows no prompt), M30 last, module and air off', () => {
     const r = simulate(prog.lines);
     const firstBurn = r.moves.find((m) => m.fire).n;
@@ -83,6 +96,17 @@ test('no power mode: not named; no outputs: no M7/M8/M9', () => {
   assert.ok(!g.lines.some((l) => /power mode/.test(l)));
   assert.ok(!g.lines.some((l) => /^M[789]$/.test(l)));
 });
+test('imperial: G20 back before M30', () => {
+  const g = T.materialGrid(Object.assign({}, O, { imperial: true }), { powers: [20], feeds: [1000], cell: 5, gap: 1, mode: 'outline', interval: 0.2, textH: 3, labelPower: 20, labelFeed: 1000 });
+  assert.deepStrictEqual(g.lines.slice(-2), ['G20', 'M30']);
+  assert.ok(g.lines.includes('G21 G90 G17'));
+});
+test('power in % scales to S and is clamped to 0..sMax', () => {
+  assert.strictEqual(T.ltS(50, 1000), 500);
+  assert.strictEqual(T.ltS(150, 1000), 1000);
+  assert.strictEqual(T.ltS(-5, 1000), 0);
+  assert.strictEqual(T.ltS(33, 255), 84);
+});
 test('aux outputs use M64/M65', () => {
   assert.strictEqual(T.ltOutput('aux:2', true), 'M64 P2');
   assert.strictEqual(T.ltOutput('aux:2', false), 'M65 P2');
@@ -95,8 +119,11 @@ test('calibration mark: G53 cross centered on the head, head left over its cente
   const burns = r.moves.filter((mv) => mv.fire);
   assert.strictEqual(burns.length, 2);
   assert.deepStrictEqual([r.end.x, r.end.y], [400, 300]);
-  assert.ok(!m.lines.includes('M9') || m.lines.indexOf('M9') > m.lines.indexOf('M5 S0'));
-  assert.ok(m.lines.includes('M9'), 'air off at the end');
+  assert.ok(!m.lines.includes('M9'), 'the module on Flood stays on: no M9');
+  assert.ok(!m.lines.includes('M30'), 'and no M30, which turns Flood off');
+  assert.ok(!m.lines.includes('M7'), 'no air assist for a mark');
+  const aux = T.calibrationMark(Object.assign({}, O, { module: { out: 'aux:3', delay: 1 } }), { x: 1, y: 1, size: 6, power: 15, feed: 1000 });
+  assert.ok(!aux.lines.includes('M65 P3') && aux.lines[aux.lines.length - 1] === 'M30', 'an aux module stays on through M30');
 });
 test('check cross: on work X0 Y0', () => {
   const c = T.checkCross(O, { size: 10, power: 20, feed: 1000 });

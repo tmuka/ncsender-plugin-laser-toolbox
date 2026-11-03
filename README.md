@@ -43,7 +43,12 @@ grblHAL's offset plugin treats selecting the laser while it's already selected a
 
 ## Safety
 
-Wear glasses rated for your laser's wavelength, never leave it running unattended, and keep an extinguisher near. Every button that sends a command shows exactly what it sends and waits for **Send**; it only sends while the machine is idle.
+Wear glasses rated for your laser's wavelength, never leave it running unattended, and keep an extinguisher near.
+
+- A laser program needs the laser selected (with the spindle selected, `M4` would run the spindle). Laser Toolbox sees which is selected from the G92 shift (with an offset and `$772=1`) and asks when it can't tell; it refuses while a job runs.
+- Every rapid carries `S0`, so it stays dark even if a program runs with laser mode off.
+- grblHAL saves G92 at the end of a program unless `$384=1`: turned off with the laser selected, it comes back with the spindle selected and the laser's offset still in G92. Setup offers `$384=1`; `G92.1` clears it.
+- Commands are sent in mm (`G21`), and `G20` follows for imperial users. Every button that sends a command shows exactly what it sends and waits for **Send**; it only sends while the machine is idle.
 
 ## Development
 
