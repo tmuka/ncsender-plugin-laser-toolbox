@@ -90,6 +90,8 @@
   .lt-presets th { color: var(--color-text-secondary); font-weight: 600; font-size: 0.78rem; }
   .lt-help ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.5; }
   .lt-help kbd, .lt-wrapper code { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; padding: 1px 5px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); }
+  .lt-laser-pick { display: flex; flex-direction: column; gap: 4px; padding: 0 12px 14px; margin-bottom: 12px; border-bottom: 1px solid var(--color-border); }
+  .lt-laser-pick label { font-size: 0.78rem; color: var(--color-text-secondary); }
   .lt-warnbox { border-left: 3px solid var(--lt-laser); padding: 8px 12px; background: color-mix(in srgb, var(--lt-laser) 8%, transparent); border-radius: 6px; font-size: 0.86rem; line-height: 1.45; }
 </style>
 
@@ -100,6 +102,7 @@
         <span class="lt-eyebrow">ncSender</span>
         <span class="lt-title">Laser Toolbox</span>
       </div>
+      <div class="lt-laser-pick"><label for="lt-laser">Laser</label><select class="lt-select" id="lt-laser" title="The laser the Offsets and Tests tabs use, and Setup edits. Each keeps its own power range, offsets and focus."></select></div>
       <nav class="lt-nav">
         <button type="button" class="lt-nav-btn active" data-tab="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Setup</button>
         <button type="button" class="lt-nav-btn" data-tab="offsets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg>Offsets</button>
@@ -125,29 +128,40 @@
           <div id="lt-setup-confirm"></div>
         </div>
         <div class="lt-card">
-          <h3 class="lt-card-title">Your laser</h3>
+          <div class="lt-card-head">
+            <h3 class="lt-card-title">Your lasers</h3>
+            <div class="lt-actions"><button type="button" class="lt-btn lt-ghost" id="lt-laser-add">Add a laser</button><button type="button" class="lt-btn lt-ghost" id="lt-laser-remove">Remove this one</button></div>
+          </div>
+          <p class="lt-sub">Each laser keeps its own power range, offset from the spindle, crosshair and focus. The one picked on the left is edited here and used by the Offsets and Tests tabs.</p>
           <div class="lt-row">
-            <div class="lt-field"><label for="lt-name">Name</label><input class="lt-input lt-text" id="lt-name" value="K60" title="The laser module's name, used in program headers."></div>
-            <div class="lt-field"><label for="lt-modes">Power modes</label><input class="lt-input lt-text" id="lt-modes" value="20 W, 40 W, 60 W" title="Power modes the module is switched between by hand, separated by commas (the LaserTree K60 has 20, 40 and 60 W). Programs name the mode to set. Blank if it has none."></div>
+            <div class="lt-field"><label for="lt-name">Name</label><input class="lt-input lt-text" id="lt-name" title="The laser module's name, used in program headers and presets."></div>
+            <div class="lt-field"><label for="lt-wavelength">Wavelength</label><input class="lt-input lt-text" id="lt-wavelength" title="For the glasses reminder: wear glasses rated for it (a blue diode is about 455 nm, an infrared laser 1064 nm)."></div>
+            <div class="lt-field"><label for="lt-watts">Optical power (W)</label><input class="lt-input" id="lt-watts" title="The module's rated optical power, kept with its presets."></div>
+            <div class="lt-field"><label for="lt-modes">Power modes</label><input class="lt-input lt-text" id="lt-modes" title="Power modes the module is switched between by hand, separated by commas (the LaserTree K60 has 20, 40 and 60 W). Programs name the mode to set. Blank if it has none."></div>
+            <div class="lt-field"><label for="lt-spindle">Spindle</label><select class="lt-select" id="lt-spindle" title="The grblHAL spindle this laser runs on (M104 Q<n>). Auto: the laser spindle Setup found. Two lasers can share one output if only one is plugged in at a time."></select></div>
+            <div class="lt-field"><label for="lt-smin">Power S from</label><input class="lt-input" id="lt-smin" title="The least S that makes this laser fire: 1% of power starts here. Blank: 0."></div>
+            <div class="lt-field"><label for="lt-smax">to S</label><input class="lt-input" id="lt-smax" title="S for 100% on this laser. Blank: the spindle's maximum ($730 or $30)."></div>
             <div class="lt-field"><label for="lt-module-out">Module power</label>
               <select class="lt-select" id="lt-module-out" title="How the module's power (and so its crosshair) is switched. A relay on Mist (M7), Flood (M8) or an aux output lets programs and the buttons here turn it on and off."></select></div>
-            <div class="lt-field"><label for="lt-module-delay">Power-on wait (s)</label><input class="lt-input" id="lt-module-delay" value="2" title="Seconds to wait after powering the module before it fires."></div>
+            <div class="lt-field"><label for="lt-module-delay">Power-on wait (s)</label><input class="lt-input" id="lt-module-delay" title="Seconds to wait after powering the module before it fires."></div>
             <div class="lt-field"><label for="lt-air-out">Air assist</label>
               <select class="lt-select" id="lt-air-out" title="The output your air assist is on, if any. Programs turn it on before burning and off at the end."></select></div>
           </div>
-          <p class="lt-note">The crosshair (positioning laser) shows while the module has power and goes dark while the beam fires.</p>
+          <p class="lt-note">The crosshair (positioning laser) shows while the module has power and goes dark while the beam fires. Its offset, the offset from the spindle and the focus Z are measured per laser on the Offsets and Tests tabs.</p>
         </div>
       </section>
 
       <!-- ============ Offsets ============ -->
       <section class="lt-tab" data-tab="offsets" hidden>
-        <div class="lt-warnbox">Wear laser glasses. Burn the marks on taped scrap, at low power, with the laser focused.</div>
+        <div class="lt-warnbox">Wear glasses rated for <span class="lt-wl">your laser&rsquo;s wavelength</span>. Burn the marks on taped scrap, at low power, with the laser focused.</div>
         <div class="lt-card">
           <div class="lt-card-head">
-            <h3 class="lt-card-title">Spindle to laser</h3>
+            <h3 class="lt-card-title">Spindle to <span class="lt-laser-name">laser</span></h3>
             <span class="lt-result" id="lt-fw-offset"></span>
           </div>
-          <p class="lt-sub">grblHAL moves the head by this offset when it switches to the laser ($770, $771), so the laser lands where the spindle was. Measure it once; re-check if the bracket moves.</p>
+          <p class="lt-sub">grblHAL moves the head by this offset when it switches to the laser ($770, $771), so the laser lands where the spindle was. Measure it once per laser; re-check if the bracket moves. grblHAL holds one laser&rsquo;s offset at a time: load the one you&rsquo;re about to use.</p>
+          <div class="lt-actions" id="lt-offset-owner"></div>
+          <div id="lt-load-confirm"></div>
           <ol class="lt-steps">
             <li>Select the laser: ncSender&rsquo;s Laser Mode, or
               <div class="lt-actions"><button type="button" class="lt-btn lt-ghost" data-switch="laser">Switch to the laser</button><span class="lt-note" id="lt-selected"></span></div></li>
@@ -174,7 +188,7 @@
         </div>
         <div class="lt-card">
           <div class="lt-card-head">
-            <h3 class="lt-card-title">Crosshair</h3>
+            <h3 class="lt-card-title"><span class="lt-laser-name">Laser</span>&rsquo;s crosshair</h3>
             <span class="lt-result" id="lt-cross-offset"></span>
           </div>
           <p class="lt-sub">The crosshair sits a little off the beam. Once its offset is known, it can put X0 Y0 on a stock corner without firing.</p>
@@ -195,6 +209,7 @@
 
       <!-- ============ Tests ============ -->
       <section class="lt-tab" data-tab="tests" hidden>
+        <div class="lt-warnbox">Wear glasses rated for <span class="lt-wl">your laser&rsquo;s wavelength</span>. Tests use the <strong class="lt-laser-name">laser</strong>&rsquo;s power range, offset and focus.</div>
         <div class="lt-card-head">
           <div class="lt-seg" id="lt-test-seg">
             <button type="button" class="active" data-test="grid">Material</button>
@@ -207,7 +222,7 @@
           <div class="lt-row">
             <div class="lt-field"><label for="lt-material">Material</label><input class="lt-input lt-text" id="lt-material" value="Plywood 3 mm" title="What you're testing on, kept with a preset."></div>
             <div class="lt-field"><label for="lt-mode">Power mode</label><select class="lt-select" id="lt-mode" title="The module's power mode for this test: set it on the module before running. The program's header names it."></select></div>
-            <div class="lt-field"><label class="lt-check"><input type="checkbox" id="lt-use-focus"> Move to focus Z</label><input class="lt-input" id="lt-focus-z" value="0" title="Work Z the laser is in focus at (from the focus test). Off: the program leaves Z where it is."></div>
+            <div class="lt-field"><label class="lt-check"><input type="checkbox" id="lt-use-focus"> Move to focus Z</label><input class="lt-input" id="lt-focus-z" value="0" title="Work Z this laser is in focus at (from the focus test), kept per laser. Off: the program leaves Z where it is."></div>
             <div class="lt-field"><label class="lt-check"><input type="checkbox" id="lt-use-air" checked> Air assist</label></div>
             <div class="lt-field"><label class="lt-check"><input type="checkbox" id="lt-use-module" checked> Power the module</label></div>
           </div>
@@ -286,7 +301,7 @@
             <div class="lt-field"><label for="lt-p-focus">Focus Z</label><input class="lt-input" id="lt-p-focus" value=""></div>
             <div class="lt-field"><button type="button" class="lt-btn" id="lt-save-preset">Save preset</button></div>
           </div>
-          <table class="lt-presets"><thead><tr><th>Material</th><th>For</th><th>Power</th><th>Feed</th><th>Passes</th><th>Focus Z</th><th>Mode</th><th></th></tr></thead><tbody id="lt-preset-list"></tbody></table>
+          <table class="lt-presets"><thead><tr><th>Laser</th><th>Material</th><th>For</th><th>Power</th><th>Feed</th><th>Passes</th><th>Focus Z</th><th>Mode</th><th></th></tr></thead><tbody id="lt-preset-list"></tbody></table>
         </div>
       </section>
 
@@ -300,6 +315,7 @@
             <li>With <code>$772=1</code> (Update G92 on spindle change) X0 Y0 stays where it was, so a laser program lands where the same program would with the spindle. With <code>0</code>, work coordinates move by the offset instead.</li>
             <li>Selecting the laser again while it&rsquo;s selected moves the head back (grblHAL counts it as switching away). So Laser Toolbox&rsquo;s programs never select a spindle: select the laser first, with ncSender&rsquo;s Laser Mode or the Switch buttons.</li>
             <li>grblHAL saves G92 at the end of a program unless <code>$384=1</code>. Turned off with the laser selected, it comes back with the spindle selected but the laser&rsquo;s offset still in G92, so spindle jobs land off by it. Setup offers <code>$384=1</code>; if it happens, <code>G92.1</code> clears it.</li>
+            <li><strong>Several lasers:</strong> grblHAL has one offset slot, so it holds one laser&rsquo;s offset at a time. To change lasers: switch to the spindle, pick the other laser, <strong>Load its offset into grblHAL</strong> (Offsets), swap the module if they share an output, then switch to the laser. Programs refuse while grblHAL holds another laser&rsquo;s offset.</li>
             <li>A laser program needs the laser selected: with the spindle selected, its <code>M4</code> would run the spindle. Laser Toolbox sees which is selected from the G92 shift (with an offset and <code>$772=1</code>), and asks when it can&rsquo;t tell.</li>
           </ul>
         </div>
@@ -752,7 +768,23 @@ if (typeof module !== 'undefined' && module.exports) {
 
 function ltF3(v) { var r = Math.round(v * 1000) / 1000; return (Object.is(r, -0) ? 0 : r).toFixed(3); }
 function ltFmt(v) { var r = Math.round(v * 1000) / 1000; return String(Object.is(r, -0) ? 0 : r); }
-function ltComment(t) { return '(' + String(t).replace(/[()]/g, '') + ')'; }
+// A comment all three firmwares take: printable ASCII without ( ) or the
+// realtime characters ! ? ~ (names and materials are typed by the user),
+// 79 characters at most with its parentheses.
+function ltClean(t) {
+  return String(t).replace(/[\u2018\u2019]/g, "'").replace(/[\u2013\u2014]/g, '-').replace(/[^\x20-\x7e]|[()!?~]/g, '').replace(/\s+/g, ' ').trim();
+}
+function ltComment(t) { var s = ltClean(t); return '(' + (s.length > 77 ? s.slice(0, 77).trim() : s) + ')'; }
+// A long text as several comment lines, wrapped at words.
+function ltComments(t) {
+  var out = [], cur = '';
+  ltClean(t).split(' ').forEach(function(w) {
+    if (cur && (cur + ' ' + w).length > 77) { out.push(ltComment(cur)); cur = w; }
+    else cur = cur ? cur + ' ' + w : w;
+  });
+  if (cur) out.push(ltComment(cur));
+  return out;
+}
 // n values from a to b, evenly spaced, rounded to `step`.
 function ltRange(a, b, n, step) {
   n = Math.max(1, Math.floor(n));
@@ -764,8 +796,12 @@ function ltRange(a, b, n, step) {
   }
   return out;
 }
-// S for a power in % of the laser spindle's maximum.
-function ltS(pct, sMax) { return Math.round(Math.max(0, Math.min(100, pct)) / 100 * sMax); }
+// S for a power in %: 0% is S0 (off), 1-100% spread over the laser's
+// range sMin..sMax (sMin: the least S that fires it; 0 by default).
+function ltS(pct, sMax, sMin) {
+  var p = Math.max(0, Math.min(100, pct)), lo = Math.max(0, Math.min(sMin || 0, sMax));
+  return p <= 0 ? 0 : Math.round(lo + p / 100 * (sMax - lo));
+}
 
 // An output: 'M7' | 'M8' | 'aux:<n>' | '' (none). On and off lines.
 function ltOutput(out, on) {
@@ -775,14 +811,14 @@ function ltOutput(out, on) {
   return m ? (on ? 'M64 P' : 'M65 P') + m[1] : null;
 }
 
-// The start of every program. o: { title, laserName, powerMode, sMax,
+// The start of every program. o: { title, laserName, powerMode, sMax, sMin,
 // module: { out, delay }, air: out, focusZ (work Z, or null to stay), lines: notes }.
 function ltStart(o) {
-  var L = [ltComment('Laser Toolbox: ' + o.title)];
-  L.push(ltComment((o.laserName || 'Laser') + (o.powerMode ? ', power mode ' + o.powerMode : '') + ', S0-' + o.sMax + ' = 0-100%'));
-  if (o.powerMode) L.push(ltComment('Set the ' + (o.laserName || 'laser') + ' to its ' + o.powerMode + ' power mode before running this'));
-  (o.notes || []).forEach(function(n) { L.push(ltComment(n)); });
-  L.push(ltComment('Select the laser and turn on Laser Mode ($32=1) before running this'));
+  var L = ltComments('Laser Toolbox: ' + o.title);
+  L = L.concat(ltComments((o.laserName || 'Laser') + (o.powerMode ? ', power mode ' + o.powerMode : '') + ', S' + (o.sMin || 0) + '-' + o.sMax + ' = 0-100%'));
+  if (o.powerMode) L = L.concat(ltComments('Set the ' + (o.laserName || 'laser') + ' to its ' + o.powerMode + ' power mode before running this'));
+  (o.notes || []).forEach(function(n) { L = L.concat(ltComments(n)); });
+  L = L.concat(ltComments('Select the ' + (o.laserName || 'laser') + (o.spindle ? ' on spindle ' + o.spindle : '') + ' and turn on Laser Mode, $32=1, before running'));
   L.push('G21 G90 G17');
   var mod = o.module && ltOutput(o.module.out, true);
   if (mod) {
@@ -818,7 +854,7 @@ function ltBurn(o, L, groups, machine) {
   var pre = machine ? 'G53 ' : '', z = null;
   groups.forEach(function(g) {
     if (g.comment) L.push(ltComment(g.comment));
-    var s = ltS(g.power, o.sMax), f = Math.round(g.feed), down = null;
+    var s = ltS(g.power, o.sMax, o.sMin), f = Math.round(g.feed), down = null;
     if (typeof g.z === 'number' && g.z !== z) {
       if (z != null && g.z < z) down = g.z;
       else { L.push('G0 Z' + ltF3(g.z) + ' S0'); z = g.z; }
@@ -990,12 +1026,166 @@ if (typeof module !== 'undefined' && module.exports) {
     cutThrough: cutThrough, calibrationMark: calibrationMark, checkCross: checkCross };
 }
 /* END lib/laser-tests.cjs */
+/* BEGIN lib/lasers.cjs */
+// The lasers: a list the user names, edits and picks between (plugin
+// settings, cfg.lasers, cfg.laserId). Each keeps its own power range, its
+// spindle (M104 Q<n>), its offset from the spindle and its crosshair's,
+// its focus, power modes and outputs.
+//
+// grblHAL's offset plugin has one slot ($770/$771), so only one laser's
+// offset is in the controller at a time: the one whose stored offset
+// matches it. Loading another's is a $770/$771 change, made with the
+// spindle selected (offsets.cjs, offsetCommands).
+
+var LZ_DEFAULTS = [
+  { id: 'k60', name: 'K60', wavelength: '455 nm (blue)', modes: '20 W, 40 W, 60 W', watts: 60 },
+  { id: 'r2', name: 'R2', wavelength: '1064 nm (IR)', modes: '', watts: 2 }
+];
+
+function lzNum(v) { var n = v === '' || v == null ? NaN : Number(v); return isFinite(n) ? n : null; }
+function lzXY(v) { return v && lzNum(v.x) != null && lzNum(v.y) != null ? { x: Number(v.x), y: Number(v.y) } : null; }
+
+// A laser with every field, from whatever was saved.
+function normalizeLaser(l, i) {
+  l = l || {};
+  return {
+    id: String(l.id || 'laser' + (i || 0)),
+    name: String(l.name == null ? 'Laser' : l.name),
+    wavelength: String(l.wavelength || ''),
+    watts: lzNum(l.watts),
+    modes: String(l.modes || ''),
+    mode: String(l.mode || ''),
+    spindle: lzNum(l.spindle),
+    sMin: lzNum(l.sMin),
+    sMax: lzNum(l.sMax),
+    moduleOut: String(l.moduleOut || ''),
+    moduleDelay: lzNum(l.moduleDelay) == null ? 2 : Number(l.moduleDelay),
+    airOut: String(l.airOut || ''),
+    focusZ: lzNum(l.focusZ),
+    useFocus: !!l.useFocus,
+    offset: lzXY(l.offset),
+    crossOff: lzXY(l.crossOff),
+    // The offset grblHAL already holds is this laser's (a migrated config):
+    // taken as its own the first time the firmware is read.
+    adoptFirmware: !!l.adoptFirmware
+  };
+}
+function defaultLasers() { return LZ_DEFAULTS.map(function(d, i) { return normalizeLaser(d, i); }); }
+
+// Settings from before the list (one laser: name, modes, moduleOut,
+// moduleDelay, airOut, crossOff, mode, and the focus fields) become its
+// first entry; the user's other laser (R2, or K60) follows unless the old
+// one already had that name. Settings with a list pass through, normalized.
+function migrateConfig(cfg) {
+  cfg = Object.assign({}, cfg || {});
+  if (Array.isArray(cfg.lasers) && cfg.lasers.length) {
+    cfg.lasers = cfg.lasers.map(normalizeLaser);
+  } else if (cfg.name != null || cfg.modes != null || cfg.crossOff || cfg.moduleOut || cfg.airOut) {
+    var f = cfg.fields || {};
+    var old = normalizeLaser({ id: 'laser0', name: cfg.name == null ? 'K60' : cfg.name, modes: cfg.modes, mode: cfg.mode,
+      moduleOut: cfg.moduleOut, moduleDelay: cfg.moduleDelay, airOut: cfg.airOut, crossOff: cfg.crossOff,
+      focusZ: f['lt-focus-z'], useFocus: f['lt-use-focus'], adoptFirmware: true }, 0);
+    var match = LZ_DEFAULTS.filter(function(d) { return d.name.toLowerCase() === old.name.trim().toLowerCase(); })[0];
+    if (match) { old.wavelength = match.wavelength; old.watts = match.watts; }
+    cfg.lasers = [old].concat(defaultLasers().filter(function(d) { return d.name.toLowerCase() !== old.name.trim().toLowerCase(); }));
+    if (cfg.mark && !cfg.mark.laser) cfg.mark.laser = old.id;
+  } else {
+    cfg.lasers = defaultLasers();
+  }
+  ['name', 'modes', 'mode', 'moduleOut', 'moduleDelay', 'airOut', 'crossOff'].forEach(function(k) { delete cfg[k]; });
+  if (cfg.fields) { delete cfg.fields['lt-focus-z']; delete cfg.fields['lt-use-focus']; }
+  if (!cfg.lasers.some(function(l) { return l.id === cfg.laserId; })) cfg.laserId = cfg.lasers[0].id;
+  return cfg;
+}
+function selectedLaser(cfg) {
+  return cfg.lasers.filter(function(l) { return l.id === cfg.laserId; })[0] || cfg.lasers[0];
+}
+// A new laser with an unused id and name.
+function newLaser(lasers) {
+  var n = lasers.length + 1, ids = lasers.map(function(l) { return l.id; }), names = lasers.map(function(l) { return l.name; });
+  while (ids.indexOf('laser' + n) >= 0 || names.indexOf('Laser ' + n) >= 0) n++;
+  return normalizeLaser({ id: 'laser' + n, name: 'Laser ' + n }, n);
+}
+
+// The spindle this laser runs on: its own choice if grblHAL has it, else
+// the laser spindle Setup found (analyzeLaser's info.laser). null: none.
+function laserSpindle(laser, info) {
+  var list = (info && info.spindles) || [];
+  if (laser && laser.spindle != null) {
+    var s = list.filter(function(sp) { return sp.num === laser.spindle; })[0];
+    if (s) return s;
+  }
+  return (info && info.laser) || null;
+}
+// Its power range in S: the laser's own, inside its spindle's (grblHAL clamps
+// S to the spindle's max anyway). 0% is S0, 1-100% runs sMin to sMax.
+function powerRange(laser, spindle) {
+  var top = spindle && spindle.sMax ? spindle.sMax : 1000;
+  var max = laser && laser.sMax != null && laser.sMax > 0 ? Math.min(laser.sMax, top) : top;
+  var min = laser && laser.sMin != null && laser.sMin > 0 ? Math.min(laser.sMin, max) : 0;
+  return { sMin: min, sMax: max };
+}
+
+// Whether grblHAL holds this laser's offset: 'loaded', 'other' (another
+// offset is in $770/$771), 'unmeasured' (this laser has none yet), or
+// 'unavailable' (no $770 in this firmware).
+function lzNear(a, b) { return Math.abs(a - b) < 0.0015; }
+function offsetState(laser, fwOffset) {
+  if (!fwOffset || !fwOffset.available) return 'unavailable';
+  if (!laser.offset) return 'unmeasured';
+  return lzNear(laser.offset.x, fwOffset.x) && lzNear(laser.offset.y, fwOffset.y) ? 'loaded' : 'other';
+}
+// The laser whose offset grblHAL holds, if any (a zero offset is no one's).
+function firmwareOwner(lasers, fwOffset) {
+  if (!fwOffset || !fwOffset.available || (!fwOffset.x && !fwOffset.y)) return null;
+  return lasers.filter(function(l) { return offsetState(l, fwOffset) === 'loaded'; })[0] || null;
+}
+// A migrated laser takes the offset grblHAL already has as its own (it was
+// the only laser then). Returns true when something changed.
+function adoptFirmwareOffset(lasers, fwOffset) {
+  var changed = false;
+  lasers.forEach(function(l) {
+    if (!l.adoptFirmware || !fwOffset || !fwOffset.available) return;
+    if (!l.offset && (fwOffset.x || fwOffset.y)) l.offset = { x: fwOffset.x, y: fwOffset.y };
+    l.adoptFirmware = false;
+    changed = true;
+  });
+  return changed;
+}
+
+// Checks for the picked laser, in Setup's shape: { id, level, title, detail }.
+function laserChecks(laser, info) {
+  var out = [], add = function(id, level, title, detail) { out.push({ id: id, level: level, title: title, detail: detail || '' }); };
+  var sp = laserSpindle(laser, info), r = powerRange(laser, sp);
+  if (laser.spindle != null && (!sp || sp.num !== laser.spindle)) {
+    add('laserSpindle', 'bad', laser.name + ': spindle ' + laser.spindle + ' isn’t in grblHAL', 'Pick its spindle again in Your lasers.');
+  } else if (sp && !sp.laserCapable) {
+    add('laserSpindle', 'bad', laser.name + ': spindle ' + sp.num + ' (' + sp.type + ') can’t run a laser', 'Pick a PWM spindle without "Disable laser mode capability".');
+  } else if (sp) {
+    add('laserSpindle', 'ok', laser.name + ' on spindle ' + sp.num + ', power S' + r.sMin + '–' + r.sMax, 'M104 Q' + sp.num + ' selects it.');
+  }
+  var s = offsetState(laser, info && info.offset);
+  if (s === 'loaded') add('laserOffset', 'ok', 'grblHAL holds ' + laser.name + '’s offset', '');
+  else if (s === 'other') add('laserOffset', 'warn', 'grblHAL holds another laser’s offset', 'Load ' + laser.name + '’s (Offsets tab) before its programs: they would land off by the difference.');
+  else if (s === 'unmeasured') add('laserOffset', 'warn', laser.name + '’s offset isn’t measured', 'Measure it on the Offsets tab.');
+  return out;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { LZ_DEFAULTS: LZ_DEFAULTS, normalizeLaser: normalizeLaser, defaultLasers: defaultLasers, migrateConfig: migrateConfig,
+    selectedLaser: selectedLaser, newLaser: newLaser, laserSpindle: laserSpindle, powerRange: powerRange, offsetState: offsetState,
+    firmwareOwner: firmwareOwner, adoptFirmwareOffset: adoptFirmwareOffset, laserChecks: laserChecks };
+}
+/* END lib/lasers.cjs */
 
   // ---------- state and settings ----------
-  var cfg = Object.assign({
-    name: 'K60', modes: '20 W, 40 W, 60 W', moduleOut: '', moduleDelay: 2, airOut: '',
-    mark: null, spindleAt: null, crossOff: null, fields: {}, presets: [], test: 'grid', mode: ''
-  }, initialConfig && typeof initialConfig === 'object' ? initialConfig : {});
+  // Settings from before the laser list are migrated into its first entry.
+  var saved = initialConfig && typeof initialConfig === 'object' ? initialConfig : {};
+  var cfg = migrateConfig(Object.assign({ mark: null, spindleAt: null, fields: {}, presets: [], test: 'grid' }, saved));
+  var migrated = !Array.isArray(saved.lasers);
+  // The laser picked in the sidebar: Setup edits it, Offsets and Tests use it.
+  function laser() { return selectedLaser(cfg); }
+  function laserById(id) { return cfg.lasers.filter(function(l) { return l.id === id; })[0] || null; }
   var st = { fw: null, info: null, ncs: {}, ms: {}, capturing: null };
   var saveTimer = null;
   function save() {
@@ -1005,10 +1195,10 @@ if (typeof module !== 'undefined' && module.exports) {
     }, 400);
   }
   // Fields keep their values between opens (cfg.fields), by id.
-  var KEPT = ['lt-mark-power', 'lt-mark-feed', 'lt-mark-size', 'lt-material', 'lt-focus-z', 'lt-label-power', 'lt-label-feed', 'lt-text-h',
+  var KEPT = ['lt-mark-power', 'lt-mark-feed', 'lt-mark-size', 'lt-material', 'lt-label-power', 'lt-label-feed', 'lt-text-h',
     'lt-g-pmin', 'lt-g-pmax', 'lt-g-pn', 'lt-g-fmin', 'lt-g-fmax', 'lt-g-fn', 'lt-g-mode', 'lt-g-cell', 'lt-g-gap', 'lt-g-int',
     'lt-f-z', 'lt-f-step', 'lt-f-n', 'lt-f-len', 'lt-f-sp', 'lt-f-power', 'lt-f-feed',
-    'lt-c-power', 'lt-c-fmin', 'lt-c-fmax', 'lt-c-fn', 'lt-c-passes', 'lt-c-len', 'lt-c-zstep', 'lt-use-focus', 'lt-use-air', 'lt-use-module'];
+    'lt-c-power', 'lt-c-fmin', 'lt-c-fmax', 'lt-c-fn', 'lt-c-passes', 'lt-c-len', 'lt-c-zstep', 'lt-use-air', 'lt-use-module'];
   function restoreFields() {
     KEPT.forEach(function(id) {
       var el = $(id), v = cfg.fields[id];
@@ -1084,7 +1274,7 @@ if (typeof module !== 'undefined' && module.exports) {
       var mode = $('lt-mode').value;
       // With a power mode to set, the dialog stays open so the reminder is seen.
       if (!mode) { note.textContent = 'Loaded ' + name + '.'; setTimeout(function() { window.postMessage({ type: 'close-plugin-dialog' }, '*'); }, 150); return; }
-      note.textContent = 'Loaded ' + name + '. Set the ' + (cfg.name || 'laser') + ' to ' + mode + ' before you run it. ';
+      note.textContent = 'Loaded ' + name + '. Set the ' + (laser().name || 'laser') + ' to ' + mode + ' before you run it. ';
       var close = document.createElement('button');
       close.type = 'button'; close.className = 'lt-btn lt-ghost'; close.textContent = 'Done, close';
       close.addEventListener('click', function() { window.postMessage({ type: 'close-plugin-dialog' }, '*'); });
@@ -1151,18 +1341,104 @@ if (typeof module !== 'undefined' && module.exports) {
     sel.innerHTML = '';
     OUTPUTS.forEach(function(o, k) { var op = document.createElement('option'); op.value = o[0]; op.textContent = k === 0 ? noneLabel : o[1]; sel.appendChild(op); });
   }
-  function powerModes() { return String(cfg.modes || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean); }
+  function powerModes() { return String(laser().modes || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean); }
   function fillModes() {
     var sel = $('lt-mode'), modes = powerModes();
     sel.innerHTML = '';
     if (!modes.length) { var op = document.createElement('option'); op.value = ''; op.textContent = 'None to set'; sel.appendChild(op); }
     modes.forEach(function(m) { var op = document.createElement('option'); op.value = m; op.textContent = m; sel.appendChild(op); });
-    if (modes.indexOf(cfg.mode) >= 0) sel.value = cfg.mode;
+    if (modes.indexOf(laser().mode) >= 0) sel.value = laser().mode;
+  }
+
+  // ---------- the lasers ----------
+  // [element id, laser key, kind]: kind 'num' (blank is null), 'bool', or text.
+  var LASER_FIELDS = [['lt-name', 'name'], ['lt-wavelength', 'wavelength'], ['lt-watts', 'watts', 'num'], ['lt-modes', 'modes'],
+    ['lt-spindle', 'spindle', 'num'], ['lt-smin', 'sMin', 'num'], ['lt-smax', 'sMax', 'num'], ['lt-module-out', 'moduleOut'],
+    ['lt-module-delay', 'moduleDelay', 'num'], ['lt-air-out', 'airOut'], ['lt-focus-z', 'focusZ', 'num'], ['lt-use-focus', 'useFocus', 'bool']];
+  function laserSp() { return st.info ? laserSpindle(laser(), st.info) : null; }
+  function fillSpindles() {
+    var sel = $('lt-spindle'), info = st.info, auto = info && info.laser;
+    sel.innerHTML = '';
+    var add = function(v, t) { var op = document.createElement('option'); op.value = v; op.textContent = t; sel.appendChild(op); };
+    add('', auto ? 'Auto (' + auto.num + ')' : 'Auto');
+    ((info && info.spindles) || []).forEach(function(sp) {
+      if (sp.laserCapable || sp.num === laser().spindle) add(String(sp.num), sp.num + ' (' + sp.type + ')');
+    });
+    if (laser().spindle != null && !sel.querySelector('option[value="' + laser().spindle + '"]')) add(String(laser().spindle), laser().spindle + ' (missing)');
+    sel.value = laser().spindle == null ? '' : String(laser().spindle);
+  }
+  function renderLaserPick() {
+    var sel = $('lt-laser'), owner = st.info ? firmwareOwner(cfg.lasers, st.info.offset) : null;
+    sel.innerHTML = '';
+    cfg.lasers.forEach(function(l) {
+      var op = document.createElement('option');
+      op.value = l.id; op.textContent = (l.name || 'Unnamed') + (owner === l ? ' (offset loaded)' : '');
+      sel.appendChild(op);
+    });
+    sel.value = cfg.laserId;
+    $('lt-laser-remove').disabled = cfg.lasers.length < 2;
+    var L = laser();
+    ROOT.querySelectorAll('.lt-laser-name').forEach(function(el) { el.textContent = L.name || 'the laser'; });
+    ROOT.querySelectorAll('.lt-wl').forEach(function(el) { el.textContent = 'the ' + (L.name || 'laser') + '’s ' + (L.wavelength || 'wavelength'); });
+  }
+  function renderLaserForm() {
+    var L = laser();
+    LASER_FIELDS.forEach(function(f) {
+      var el = $(f[0]), v = L[f[1]];
+      if (f[2] === 'bool') el.checked = !!v;
+      else if (f[0] !== 'lt-spindle') el.value = v == null ? '' : String(v);
+    });
+    if (L.focusZ == null) $('lt-focus-z').value = '0';
+    fillSpindles();
+  }
+  // Everything that shows the picked laser.
+  function renderLaser() {
+    renderLaserPick();
+    renderLaserForm();
+    fillModes();
+    if (st.info) { renderChecks(); renderOffsets(); }
+    drawPreview();
+  }
+  function laserFieldChanged(f) {
+    var el = $(f[0]), L = laser(), raw = el.type === 'checkbox' ? el.checked : String(el.value).trim();
+    if (f[2] === 'bool') L[f[1]] = !!raw;
+    else if (f[2] === 'num') { var n = raw === '' ? null : (f[0] === 'lt-focus-z' ? val(f[0], NaN) : Number(raw)); el.classList.toggle('lt-bad', n != null && !isFinite(n)); L[f[1]] = n != null && isFinite(n) ? n : null; }
+    else L[f[1]] = raw;
+    if (f[1] === 'name') cfg.presets.forEach(function(p) { if (p.laserId === L.id) p.laser = L.name; });
+    save();
+    if (f[1] === 'name' || f[1] === 'wavelength') renderLaserPick();
+    if (f[1] === 'modes') fillModes();
+    if (f[1] === 'name') renderPresets();
+    if (/^(spindle|sMin|sMax|name)$/.test(f[1]) && st.info) renderChecks();
+    if (/^(moduleOut|name)$/.test(f[1]) && st.info) renderOffsets();
+  }
+  function pickLaser(id) {
+    if (!laserById(id)) return;
+    cfg.laserId = id;
+    save();
+    ['lt-offsets-confirm', 'lt-offset-confirm', 'lt-load-confirm', 'lt-cross-confirm', 'lt-gen-confirm'].forEach(function(h) { $(h).innerHTML = ''; });
+    renderLaser();
+  }
+  function addLaser() {
+    var l = newLaser(cfg.lasers);
+    cfg.lasers.push(l);
+    pickLaser(l.id);
+    showTab('setup');
+    $('lt-name').focus();
+    $('lt-name').select();
+  }
+  async function removeLaser() {
+    if (cfg.lasers.length < 2) return;
+    var L = laser();
+    if (!(await askYes($('lt-setup-confirm'), 'Remove ' + (L.name || 'this laser') + ' and its offsets and focus? Its presets stay.', 'Remove it'))) return;
+    cfg.lasers = cfg.lasers.filter(function(l) { return l !== L; });
+    if (cfg.mark && cfg.mark.laser === L.id) { cfg.mark = null; cfg.spindleAt = null; }
+    pickLaser(cfg.lasers[0].id);
   }
   function renderChecks() {
     var list = $('lt-checks');
     list.innerHTML = '';
-    setupChecks(st.info, st.ncs, st.ms).forEach(function(c) {
+    setupChecks(st.info, st.ncs, st.ms).concat(laserChecks(laser(), st.info)).forEach(function(c) {
       var li = document.createElement('li');
       li.setAttribute('data-level', c.level);
       li.innerHTML = '<span class="lt-badge"></span><span><strong></strong><span class="lt-detail"></span></span>';
@@ -1190,40 +1466,75 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   async function refresh() {
     await readAll();
+    if (adoptFirmwareOffset(cfg.lasers, st.info.offset)) save();
+    renderLaserPick();
+    fillSpindles();
     renderChecks();
     renderOffsets();
   }
 
   // ---------- Offsets ----------
   function fmt3(v) { return (Math.round(v * 1000) / 1000).toFixed(3); }
+  // The calibration mark, if it was burned with the picked laser.
+  function myMark() { return cfg.mark && cfg.mark.laser === laser().id ? cfg.mark : null; }
   function renderOffsets() {
-    var o = st.info ? st.info.offset : null;
-    $('lt-fw-offset').textContent = !o ? '' : !o.available ? 'No $770/$771 in this grblHAL' : 'Now: X ' + fmt3(o.x) + '  Y ' + fmt3(o.y) + ' mm';
+    var o = st.info ? st.info.offset : null, L = laser(), mark = myMark();
+    var owner = st.info ? firmwareOwner(cfg.lasers, o) : null;
+    $('lt-fw-offset').textContent = !o ? '' : !o.available ? 'No $770/$771 in this grblHAL' : 'grblHAL now: X ' + fmt3(o.x) + '  Y ' + fmt3(o.y) + ' mm' + (owner ? ' (' + owner.name + ')' : '');
+    renderOffsetOwner();
     var sel = st.info ? laserSelected(st.ms, o) : 'unknown';
-    $('lt-selected').textContent = sel === true ? 'The laser is selected.' : sel === false ? 'The spindle is selected.' : '';
-    $('lt-cross-offset').textContent = cfg.crossOff ? 'X ' + fmt3(cfg.crossOff.x) + '  Y ' + fmt3(cfg.crossOff.y) + ' mm from the beam' : 'Not measured yet';
-    var age = cfg.mark && cfg.mark.t ? Math.round((Date.now() - cfg.mark.t) / 60000) : null;
-    $('lt-mark-note').textContent = cfg.mark ? 'Mark at machine X ' + fmt3(cfg.mark.x) + ' Y ' + fmt3(cfg.mark.y) +
-      (age == null ? '' : age < 1 ? ', burned just now' : age < 120 ? ', burned ' + age + ' min ago' : ', burned ' + Math.round(age / 60) + ' h ago: burn a new one if the stock or the bracket moved') + '.' : '';
+    $('lt-selected').textContent = sel === true ? 'A laser is selected.' : sel === false ? 'The spindle is selected.' : '';
+    $('lt-cross-offset').textContent = L.crossOff ? 'X ' + fmt3(L.crossOff.x) + '  Y ' + fmt3(L.crossOff.y) + ' mm from the beam' : 'Not measured yet';
+    var age = mark && mark.t ? Math.round((Date.now() - mark.t) / 60000) : null;
+    var other = cfg.mark && !mark ? laserById(cfg.mark.laser) : null;
+    $('lt-mark-note').textContent = mark ? 'Mark at machine X ' + fmt3(mark.x) + ' Y ' + fmt3(mark.y) +
+      (age == null ? '' : age < 1 ? ', burned just now' : age < 120 ? ', burned ' + age + ' min ago' : ', burned ' + Math.round(age / 60) + ' h ago: burn a new one if the stock or the bracket moved') + '.'
+      : other ? 'The last mark was burned with the ' + other.name + ': burn one with the ' + L.name + '.' : '';
     var n = $('lt-new-offset');
-    if (cfg.mark && cfg.spindleAt) {
-      var off = laserOffset(cfg.mark, cfg.spindleAt);
-      n.textContent = 'X ' + fmt3(off.x) + '  Y ' + fmt3(off.y) + ' mm' + (o && o.available ? '  (grblHAL has X ' + fmt3(o.x) + ' Y ' + fmt3(o.y) + ')' : '');
+    if (mark && cfg.spindleAt) {
+      var off = laserOffset(mark, cfg.spindleAt);
+      n.textContent = 'X ' + fmt3(off.x) + '  Y ' + fmt3(off.y) + ' mm' + (L.offset ? '  (' + L.name + ' had X ' + fmt3(L.offset.x) + ' Y ' + fmt3(L.offset.y) + ')' : '');
       $('lt-write-offset').disabled = !(o && o.available);
     } else {
-      n.textContent = cfg.mark ? 'Now put the spindle’s tip on the mark (steps 3 and 4).' : 'Not measured yet.';
+      n.textContent = mark ? 'Now put the spindle’s tip on the mark (steps 3 and 4).' : L.offset ? L.name + '’s: X ' + fmt3(L.offset.x) + '  Y ' + fmt3(L.offset.y) + ' mm. Burn a mark to measure it again.' : 'Not measured yet.';
       $('lt-write-offset').disabled = true;
     }
     var mb = $('lt-module-btns');
     mb.innerHTML = '';
-    if (cfg.moduleOut) {
+    if (L.moduleOut) {
       [['Module on', true], ['Module off', false]].forEach(function(p) {
         var b = document.createElement('button');
         b.type = 'button'; b.className = 'lt-btn lt-ghost'; b.textContent = p[0];
-        b.addEventListener('click', function() { confirmSend($('lt-cross-confirm'), p[0] + (!p[1] && /^M[78]$/.test(cfg.moduleOut) ? ' (M9 turns off Mist and Flood both):' : ':'), [ltOutput(cfg.moduleOut, p[1])]); });
+        b.addEventListener('click', function() { confirmSend($('lt-cross-confirm'), p[0] + (!p[1] && /^M[78]$/.test(L.moduleOut) ? ' (M9 turns off Mist and Flood both):' : ':'), [ltOutput(L.moduleOut, p[1])]); });
         mb.appendChild(b);
       });
     }
+  }
+  // Whether grblHAL holds the picked laser's offset, and a button to load it.
+  function renderOffsetOwner() {
+    var box = $('lt-offset-owner'), L = laser(), o = st.info && st.info.offset;
+    box.innerHTML = '';
+    var s = o ? offsetState(L, o) : 'unavailable', note = document.createElement('span');
+    note.className = 'lt-note';
+    box.appendChild(note);
+    if (s === 'loaded') { note.setAttribute('data-state', 'ok'); note.textContent = 'grblHAL holds the ' + L.name + '’s offset (X ' + fmt3(L.offset.x) + ' Y ' + fmt3(L.offset.y) + ').'; return; }
+    if (s === 'unmeasured') { note.textContent = 'The ' + L.name + '’s offset isn’t measured yet: steps below.'; return; }
+    if (s !== 'other') return;
+    var owner = firmwareOwner(cfg.lasers, o);
+    note.setAttribute('data-state', 'warn');
+    note.textContent = 'grblHAL holds ' + (owner ? 'the ' + owner.name + '’s' : 'another') + ' offset. The ' + L.name + '’s is X ' + fmt3(L.offset.x) + ' Y ' + fmt3(L.offset.y) + '.';
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'lt-btn'; b.textContent = 'Load the ' + L.name + '’s offset into grblHAL';
+    b.addEventListener('click', function() { loadLaserOffset(L); });
+    box.appendChild(b);
+  }
+  // $770/$771 to this laser's offset: only with the spindle selected (offsetChange).
+  function loadLaserOffset(L) {
+    if (!L.offset) return;
+    var off = { x: L.offset.x, y: L.offset.y };
+    offsetChange($('lt-load-confirm'), 'Put the ' + L.name + '’s offset in grblHAL (with the spindle selected):', function() { return offsetCommands(off); }, async function(ok) {
+      if (ok) { await readOffsetLive(); renderLaserPick(); renderOffsets(); renderChecks(); }
+    });
   }
   function needHomedIdle(note) {
     if (!st.ms.connected) { note.setAttribute('data-state', 'bad'); note.textContent = 'Connect to the controller first.'; return false; }
@@ -1231,40 +1542,51 @@ if (typeof module !== 'undefined' && module.exports) {
     if (!st.ms.homed) { note.setAttribute('data-state', 'bad'); note.textContent = 'Home the machine first.'; return false; }
     return true;
   }
+  // The picked laser's name, spindle, power range and outputs, for a program.
   function programOptions() {
-    return { laserName: cfg.name || 'Laser', powerMode: $('lt-mode').value || '', sMax: (st.info.laser && st.info.laser.sMax) || 1000,
-      module: $('lt-use-module').checked && cfg.moduleOut ? { out: cfg.moduleOut, delay: Number(cfg.moduleDelay) || 0 } : null,
-      air: $('lt-use-air').checked ? cfg.airOut : '', rapid: Number(st.ms.maxFeedrate) || 5000, imperial: imperial() };
+    var L = laser(), sp = laserSp(), r = powerRange(L, sp);
+    return { laserName: L.name || 'Laser', spindle: sp ? sp.num : null, powerMode: $('lt-mode').value || '', sMax: r.sMax, sMin: r.sMin,
+      module: $('lt-use-module').checked && L.moduleOut ? { out: L.moduleOut, delay: Number(L.moduleDelay) || 0 } : null,
+      air: $('lt-use-air').checked ? L.airOut : '', rapid: Number(st.ms.maxFeedrate) || 5000, imperial: imperial() };
   }
   // A laser program needs the laser selected: with the spindle selected, its
   // M4 S would run the spindle. Seen from the G92 shift when there's an offset
   // and $772=1; otherwise asked.
-  async function laserReady(note, holder) {
-    if (!st.info.laser) { note.setAttribute('data-state', 'bad'); note.textContent = 'No laser spindle in grblHAL (see Setup).'; return false; }
+  // anyOffset: the program doesn't depend on the laser's offset (the mark,
+  // in machine coordinates); otherwise grblHAL must hold this laser's.
+  async function laserReady(note, holder, anyOffset) {
+    var L = laser(), sp = laserSp();
+    if (!sp) { note.setAttribute('data-state', 'bad'); note.textContent = 'No laser spindle in grblHAL (see Setup).'; return false; }
+    if (!sp.laserCapable) { note.setAttribute('data-state', 'bad'); note.textContent = 'The ' + L.name + '’s spindle ' + sp.num + ' can’t run a laser (see Setup).'; return false; }
+    if (!anyOffset) {
+      var os = offsetState(L, st.info.offset);
+      if (os === 'other') { note.setAttribute('data-state', 'bad'); note.textContent = 'grblHAL holds another laser’s offset: load the ' + L.name + '’s on the Offsets tab first, or the program lands off by the difference.'; return false; }
+      if (os === 'unmeasured' && !(await askYes(holder, 'The ' + L.name + '’s offset isn’t measured, so the program may not land where the spindle’s would. Make it anyway?', 'Yes, make it'))) return false;
+    }
     if (!(await readLaserModeLive())) { note.setAttribute('data-state', 'bad'); note.textContent = 'Turn on Laser Mode ($32=1) first: with it off, M4 keeps the laser on during rapids.'; return false; }
     var sel = laserSelected(st.ms, st.info.offset);
     if (sel === false) { note.setAttribute('data-state', 'bad'); note.textContent = 'The spindle is selected: switch to the laser first (Offsets, or ncSender\u2019s Laser Mode). Its M4 would run the spindle.'; return false; }
     if (sel === 'unknown') {
       note.textContent = '';
-      return askYes(holder, 'Is the laser (spindle ' + st.info.laser.num + ') selected? With the spindle selected, the program\u2019s M4 would run the spindle.', 'Yes, the laser is selected');
+      return askYes(holder, 'Is the ' + L.name + ' (spindle ' + sp.num + ') selected? With the spindle selected, the program\u2019s M4 would run the spindle.', 'Yes, the laser is selected');
     }
     return true;
   }
   async function burnMark() {
     var note = $('lt-mark-note');
     await readState();
-    if (!needHomedIdle(note) || !(await laserReady(note, $('lt-offsets-confirm')))) return;
+    if (!needHomedIdle(note) || !(await laserReady(note, $('lt-offsets-confirm'), true))) return;
     await readState();
     var at = mpos();
     var prog = calibrationMark(programOptions(), { x: at.x, y: at.y, size: val('lt-mark-size', 6), power: val('lt-mark-power', 10), feed: val('lt-mark-feed', 1000) });
-    cfg.mark = { x: at.x, y: at.y, t: Date.now() }; cfg.spindleAt = null;
+    cfg.mark = { x: at.x, y: at.y, t: Date.now(), laser: laser().id }; cfg.spindleAt = null;
     save();
     loadProgram('LaserToolbox-mark.nc', prog.lines, note);
   }
   async function spindleOnMark() {
     var note = $('lt-mark-note');
     await readState();
-    if (!cfg.mark) { note.setAttribute('data-state', 'warn'); note.textContent = 'Burn a mark first (step 2).'; return; }
+    if (!myMark()) { note.setAttribute('data-state', 'warn'); note.textContent = 'Burn a mark with the ' + laser().name + ' first (step 2).'; return; }
     if (!needHomedIdle(note)) return;
     var at = mpos();
     cfg.spindleAt = { x: at.x, y: at.y };
@@ -1276,9 +1598,9 @@ if (typeof module !== 'undefined' && module.exports) {
     await readState();
     holder.innerHTML = '';
     var note = document.createElement('p'); note.className = 'lt-note'; holder.appendChild(note);
-    if (!cfg.mark) { note.setAttribute('data-state', 'warn'); note.textContent = 'Burn a mark first.'; return; }
+    if (!myMark()) { note.setAttribute('data-state', 'warn'); note.textContent = 'Burn a mark with the ' + laser().name + ' first.'; return; }
     if (!needHomedIdle(note)) return;
-    cfg.crossOff = crosshairOffset(mpos(), cfg.mark);
+    laser().crossOff = crosshairOffset(mpos(), cfg.mark);
     save();
     renderOffsets();
   }
@@ -1297,14 +1619,21 @@ if (typeof module !== 'undefined' && module.exports) {
       return laserSelected(st.ms, st.info.offset) === true ? 'The laser is selected now: switch to the spindle first.' : null;
     });
   }
-  function laserOff() { return st.info && st.info.offset ? { x: st.info.offset.x, y: st.info.offset.y } : { x: 0, y: 0 }; }
+  // Where the picked laser sits from the spindle: its measured offset, else
+  // what grblHAL holds.
+  function laserOff() {
+    var L = laser();
+    if (L.offset) return { x: L.offset.x, y: L.offset.y };
+    return st.info && st.info.offset ? { x: st.info.offset.x, y: st.info.offset.y } : { x: 0, y: 0 };
+  }
   async function zeroAtCross() {
     var holder = $('lt-cross-confirm');
     await readState();
-    if (!cfg.crossOff) { holder.innerHTML = '<p class="lt-note" data-state="warn">Measure the crosshair first.</p>'; return; }
+    var L = laser();
+    if (!L.crossOff) { holder.innerHTML = '<p class="lt-note" data-state="warn">Measure the ' + L.name + '\u2019s crosshair first.</p>'; return; }
     var w = activeWcs(st.ms);
-    confirmSend(holder, 'Put ' + w.name + '\u2019s X0 Y0 where the crosshair points (read again at Send):', function() {
-      return [zeroAtCrosshairCommand(mpos(), cfg.crossOff, laserOff(), activeWcs(st.ms).index)];
+    confirmSend(holder, 'Put ' + w.name + '\u2019s X0 Y0 where the ' + L.name + '\u2019s crosshair points (read again at Send):', function() {
+      return [zeroAtCrosshairCommand(mpos(), L.crossOff, laserOff(), activeWcs(st.ms).index)];
     }, function() { readAll().then(renderOffsets); }, strayCheck);
   }
   async function gotoZero(which) {
@@ -1312,20 +1641,23 @@ if (typeof module !== 'undefined' && module.exports) {
     await readState();
     var w = activeWcs(st.ms);
     if (w.origin.x == null) { holder.innerHTML = '<p class="lt-note" data-state="bad">ncSender didn’t say where X0 Y0 is.</p>'; return; }
-    if (which === 'crosshair' && !cfg.crossOff) { holder.innerHTML = '<p class="lt-note" data-state="warn">Measure the crosshair first.</p>'; return; }
+    var L = laser();
+    if (which === 'crosshair' && !L.crossOff) { holder.innerHTML = '<p class="lt-note" data-state="warn">Measure the crosshair first.</p>'; return; }
     var z = switchCommands(false, 0, st.safeZ)[0];
-    confirmSend(holder, (which === 'spindle' ? 'The spindle\u2019s tip' : which === 'laser' ? 'The laser' : 'The crosshair') + ' over X0 Y0 (at Safe Z; jog down to look):',
-      [z, moveOverZero(w.origin, cfg.crossOff || { x: 0, y: 0 }, laserOff(), which)], null, strayCheck);
+    confirmSend(holder, (which === 'spindle' ? 'The spindle\u2019s tip' : which === 'laser' ? 'The ' + L.name : 'The ' + L.name + '\u2019s crosshair') + ' over X0 Y0 (at Safe Z; jog down to look):',
+      [z, moveOverZero(w.origin, L.crossOff || { x: 0, y: 0 }, laserOff(), which)], null, strayCheck);
   }
   function switchTo(toLaser) {
     var holder = $('lt-offsets-confirm');
-    if (!st.info.laser) { holder.innerHTML = '<p class="lt-note" data-state="bad">No laser spindle in grblHAL (see Setup).</p>'; return; }
+    var sp = laserSp(), L = laser();
+    if (!sp) { holder.innerHTML = '<p class="lt-note" data-state="bad">No laser spindle in grblHAL (see Setup).</p>'; return; }
     var sel = laserSelected(st.ms, st.info.offset);
     if (toLaser && sel === true) { holder.innerHTML = '<p class="lt-note" data-state="warn">The laser is already selected. Selecting it again would move the head back.</p>'; return; }
     if (!toLaser && sel === false) { holder.innerHTML = '<p class="lt-note">The spindle is already selected.</p>'; return; }
     if (st.switching) { holder.innerHTML = '<p class="lt-note">Waiting for the last switch to show\u2026</p>'; return; }
-    confirmSend(holder, toLaser ? 'Switch to the laser (grblHAL moves the head by the offset):' : 'Switch to the spindle (grblHAL moves the head back):',
-      switchCommands(toLaser, st.info.laser.num, st.safeZ), function(ok) {
+    if (toLaser && offsetState(L, st.info.offset) === 'other') { holder.innerHTML = '<p class="lt-note" data-state="warn">grblHAL holds another laser\u2019s offset: load the ' + L.name + '\u2019s first (above), with the spindle selected.</p>'; return; }
+    confirmSend(holder, toLaser ? 'Switch to the ' + L.name + ' (grblHAL moves the head by the offset):' : 'Switch to the spindle (grblHAL moves the head back):',
+      switchCommands(toLaser, sp.num, st.safeZ), function(ok) {
         if (!ok) return;
         st.switching = true;
         setTimeout(function() { readAll().then(function() { st.switching = false; renderOffsets(); }); }, 1500);
@@ -1358,7 +1690,7 @@ if (typeof module !== 'undefined' && module.exports) {
       return Object.assign(common, { zs: zs, length: Math.max(2, val('lt-f-len', 30)), spacing: Math.max(common.textH + 1, val('lt-f-sp', 5)),
         power: val('lt-f-power', 40), feed: val('lt-f-feed', 2000), labelZ: mid });
     }
-    var zTop = $('lt-use-focus').checked ? val('lt-focus-z', 0) : null;
+    var zTop = laser().useFocus ? (laser().focusZ == null ? 0 : laser().focusZ) : null;
     return Object.assign(common, { power: val('lt-c-power', 100), feeds: ltRange(val('lt-c-fmin', 200), val('lt-c-fmax', 800), Math.min(20, Math.max(1, val('lt-c-fn', 4))), 10),
       passes: Math.min(20, Math.max(1, Math.round(val('lt-c-passes', 5)))), length: Math.max(2, val('lt-c-len', 15)), gapX: 4, gapY: Math.max(common.textH + 2, 6),
       zTop: zTop, zStep: zTop == null ? 0 : Math.max(0, val('lt-c-zstep', 0)) });
@@ -1367,7 +1699,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var kind = cfg.test, o = programOptions();
     o.material = $('lt-material').value;
     o.notes = ['Material: ' + o.material, 'X0 Y0: the front-left corner of the test'];
-    o.focusZ = $('lt-use-focus').checked && kind !== 'focus' ? val('lt-focus-z', 0) : null;
+    o.focusZ = laser().useFocus && kind !== 'focus' ? (laser().focusZ == null ? 0 : laser().focusZ) : null;
     if (kind === 'grid') return materialGrid(o, testParams('grid'));
     if (kind === 'focus') return focusLadder(o, testParams('focus'));
     return cutThrough(o, testParams('cut'));
@@ -1424,10 +1756,10 @@ if (typeof module !== 'undefined' && module.exports) {
   function renderPresets() {
     var tb = $('lt-preset-list');
     tb.innerHTML = '';
-    if (!cfg.presets.length) { tb.innerHTML = '<tr><td colspan="8" class="lt-note">None yet.</td></tr>'; return; }
+    if (!cfg.presets.length) { tb.innerHTML = '<tr><td colspan="9" class="lt-note">None yet.</td></tr>'; return; }
     cfg.presets.forEach(function(p, i) {
       var tr = document.createElement('tr');
-      [p.material, p.op, p.power + '%', p.feed, p.passes, p.focusZ == null ? '' : p.focusZ, p.powerMode || ''].forEach(function(v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+      [p.laser || '', p.material, p.op, p.power + '%', p.feed, p.passes, p.focusZ == null ? '' : p.focusZ, p.powerMode || ''].forEach(function(v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
       var td = document.createElement('td'), b = document.createElement('button');
       b.type = 'button'; b.className = 'lt-btn lt-ghost'; b.textContent = 'Remove';
       b.addEventListener('click', function() { cfg.presets.splice(i, 1); save(); renderPresets(); });
@@ -1439,7 +1771,8 @@ if (typeof module !== 'undefined' && module.exports) {
     if (!isFinite(power) || !isFinite(feed)) { $('lt-p-power').classList.toggle('lt-bad', !isFinite(power)); $('lt-p-feed').classList.toggle('lt-bad', !isFinite(feed)); return; }
     var fz = String($('lt-p-focus').value).trim();
     cfg.presets.push({ material: $('lt-material').value, op: $('lt-p-op').value, power: power, feed: feed, passes: Math.max(1, Math.round(val('lt-p-passes', 1))),
-      focusZ: fz === '' ? null : val('lt-p-focus', null), powerMode: $('lt-mode').value || '', interval: cfg.test === 'grid' ? val('lt-g-int', 0.1) : null, laser: cfg.name });
+      focusZ: fz === '' ? null : val('lt-p-focus', null), powerMode: $('lt-mode').value || '', interval: cfg.test === 'grid' ? val('lt-g-int', 0.1) : null, laser: laser().name, laserId: laser().id,
+      sMin: programOptions().sMin, sMax: programOptions().sMax });
     save();
     renderPresets();
   }
@@ -1457,14 +1790,18 @@ if (typeof module !== 'undefined' && module.exports) {
     $('lt-recheck').addEventListener('click', refresh);
     fillOutputs($('lt-module-out'), 'Switched by hand');
     fillOutputs($('lt-air-out'), 'None');
-    $('lt-name').value = cfg.name; $('lt-modes').value = cfg.modes; $('lt-module-out').value = cfg.moduleOut || '';
-    $('lt-module-delay').value = cfg.moduleDelay; $('lt-air-out').value = cfg.airOut || '';
-    [['lt-name', 'name'], ['lt-modes', 'modes'], ['lt-module-out', 'moduleOut'], ['lt-module-delay', 'moduleDelay'], ['lt-air-out', 'airOut']].forEach(function(p) {
-      $(p[0]).addEventListener('change', function() { cfg[p[1]] = $(p[0]).value; save(); fillModes(); renderOffsets(); drawPreview(); });
+    LASER_FIELDS.forEach(function(f) {
+      var el = $(f[0]);
+      el.addEventListener(el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input', function() { laserFieldChanged(f); });
     });
+    $('lt-laser').addEventListener('change', function() { pickLaser($('lt-laser').value); });
+    $('lt-laser-add').addEventListener('click', addLaser);
+    $('lt-laser-remove').addEventListener('click', removeLaser);
     restoreFields();
+    renderLaserPick();
+    renderLaserForm();
     fillModes();
-    $('lt-mode').addEventListener('change', function() { cfg.mode = $('lt-mode').value; save(); drawPreview(); });
+    $('lt-mode').addEventListener('change', function() { laser().mode = $('lt-mode').value; save(); drawPreview(); });
     ROOT.addEventListener('input', function(e) { if (e.target.id) { keepField(e.target); if (ROOT.querySelector('.lt-tab[data-tab="tests"]:not([hidden])')) drawPreview(); } });
     ROOT.addEventListener('change', function(e) { if (e.target.id) keepField(e.target); });
     $('lt-burn-mark').addEventListener('click', burnMark);
@@ -1475,9 +1812,11 @@ if (typeof module !== 'undefined' && module.exports) {
     ROOT.querySelectorAll('[data-switch]').forEach(function(b) { b.addEventListener('click', function() { switchTo(b.getAttribute('data-switch') === 'laser'); }); });
     ROOT.querySelectorAll('[data-goto]').forEach(function(b) { b.addEventListener('click', function() { gotoZero(b.getAttribute('data-goto')); }); });
     $('lt-write-offset').addEventListener('click', function() {
+      var L = laser();
+      if (!myMark() || !cfg.spindleAt) return;
       var off = laserOffset(cfg.mark, cfg.spindleAt);
-      offsetChange($('lt-offset-confirm'), 'Store the offset in grblHAL (and keep X0 Y0 on a switch):', function() { return offsetCommands(off); }, async function(ok) {
-        if (ok) { cfg.spindleAt = null; save(); await readOffsetLive(); renderOffsets(); renderChecks(); }
+      offsetChange($('lt-offset-confirm'), 'Store the ' + L.name + '\u2019s offset in grblHAL (and keep X0 Y0 on a switch):', function() { return offsetCommands(off); }, async function(ok) {
+        if (ok) { L.offset = off; cfg.spindleAt = null; save(); await readOffsetLive(); renderLaserPick(); renderOffsets(); renderChecks(); }
       });
     });
     ROOT.querySelectorAll('#lt-test-seg button').forEach(function(b) { b.addEventListener('click', function() { showTest(b.getAttribute('data-test')); }); });
@@ -1488,6 +1827,7 @@ if (typeof module !== 'undefined' && module.exports) {
     showTab(tab);
   }
   wire();
+  if (migrated) save();
   renderPresets();
   refresh().then(function() { showTest(cfg.test || 'grid'); });
 })();

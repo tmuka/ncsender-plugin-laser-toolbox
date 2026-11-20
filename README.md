@@ -2,7 +2,7 @@
 
 Laser basics for an [ncSender](https://github.com/siganberg/ncSender) router with a laser module beside the spindle, on grblHAL: check the laser setup, measure the spindle-to-laser offset once and store it in grblHAL, measure the crosshair (positioning laser) offset and zero on the stock with it, and run material, focus and cut-through tests to find power, feed and focus.
 
-Built for a LaserTree K60 on a bracket beside a VFD spindle (SuperLongBoard Ext, grblHAL 1.1f), but nothing in it is specific to that module.
+Built for a LaserTree K60 and a 2 W infrared R2 beside a VFD spindle (SuperLongBoard Ext, grblHAL 1.1f), but nothing in it is specific to that module.
 
 ## Setup
 
@@ -11,9 +11,11 @@ The **Setup** tab reads what grblHAL and ncSender have (without sending anything
 - **A laser spindle:** a PWM spindle that can run a laser. Beside a VFD spindle that's a second spindle (`$511` = PWM2); `M104 Q1` selects it, `M104 Q0` the VFD. Its power range comes from `$730` (PWM2) or `$30` (PWM).
 - **Laser mode** (`$32=1`): with it off, `M4` keeps the beam on during rapids. ncSender Pro's Laser Mode switch sets it; Laser Toolbox won't make a program until it's on.
 - **The offset:** grblHAL's spindle offset plugin keeps the laser's offset from the spindle in `$770` (X) and `$771` (Y). `$772=1` (Update G92 on spindle change) keeps X0 Y0 where it was when you switch, so a laser program lands where the same program would with the spindle.
-- **Your laser:** its name, its **power modes** (switched by hand on the module, like the K60's 20 / 40 / 60 W: every program names the mode to set, in its header and when it loads; no `M0` pause, since ncSender shows no prompt for one), how its **power** is switched (by hand, or a relay on Mist, Flood or an aux output: then the crosshair can be switched too), and the **air assist** output.
+- **Your lasers:** a list you add to, name, edit and remove from; pick one in the sidebar's **Laser** menu, and Setup edits it while Offsets and Tests use it. It starts with a K60 (455 nm blue diode) and an R2 (1064 nm infrared). Each has its own **spindle** (`M104 Q<n>`; two lasers can share one output when only one is plugged in), its own **power range** (S from / to S: 0% is `S0`, 1-100% spans the range, never above the spindle's maximum), its own offsets and focus Z, its name, its **power modes** (switched by hand on the module, like the K60's 20 / 40 / 60 W: every program names the mode to set, in its header and when it loads; no `M0` pause, since ncSender shows no prompt for one), how its **power** is switched (by hand, or a relay on Mist, Flood or an aux output: then the crosshair can be switched too), and the **air assist** output.
 
 ## Offsets
+
+Each laser has its own offsets, measured with that laser picked. grblHAL holds one offset at a time (`$770`/`$771`): the Offsets tab says whose it holds and **Load the R2's offset into grblHAL** swaps it in (with the spindle selected, since grblHAL takes the old amount back out of G92 when it switches away). Programs and **Switch to the laser** refuse while grblHAL holds another laser's offset.
 
 **Spindle to laser** (once, and again if the bracket moves):
 
@@ -35,7 +37,7 @@ X0 Y0 is the front-left corner of every test. Each program names the power mode 
 - **Material grid:** power across, feed up the side; cells filled (engraving, at a line interval) or outlined (scoring).
 - **Focus ladder:** the same line at a row of heights, each labelled with its Z. The thinnest line is in focus.
 - **Cut-through:** at one power, rows of feed and columns of passes (optionally lower each pass). The first cut through is the setting.
-- **Presets:** save the best cell (material, power, feed, passes, focus Z, power mode). Spoilboard Toolbox can read them for its laser grid and labels.
+- **Presets:** save the best cell (laser, material, power, feed, passes, focus Z, power mode). Spoilboard Toolbox can read them for its laser grid and labels.
 
 ## Programs never select a spindle
 

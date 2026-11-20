@@ -11,6 +11,7 @@ tests. `docs/PLAN.md` is the plan; README.md the user guide. GPL-3.0.
 | `config.html` | The dialog: markup, styles, the UI script. ncSender runs it inline, so `lib/*.cjs` are copied into it between `/* BEGIN lib/x.cjs */` markers (they share one scope: prefix helper names per lib). |
 | `lib/laser-setup.cjs` | Reads `/api/firmware` (spindles `$395`, `$511-$513`, PWM options `$9`/`$709`, S ranges, `$32`, `$770-$772`), the checklist, which spindle is selected (from WCO − work offset = laser offset when `$772=1`). |
 | `lib/offsets.cjs` | The offset math and commands; `simulateSwitch` models grblHAL's `Plugins_spindle/offset.c`. |
+| `lib/lasers.cjs` | The laser list (`cfg.lasers`, `cfg.laserId`): defaults (K60, R2), migrating 0.1.0's single laser, each laser's spindle, power range and offset, whose offset grblHAL holds (`offsetState`, `firmwareOwner`). |
 | `lib/laser-tests.cjs` | The programs: material grid, focus ladder, cut-through, calibration mark (G53), check cross. |
 | `lib/unit-input.cjs`, `lib/stroke-font.cjs` | Copied from QuickCut and Spoilboard Toolbox; keep in step. |
 

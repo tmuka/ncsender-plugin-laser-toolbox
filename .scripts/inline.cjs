@@ -6,7 +6,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const file = path.join(root, 'config.html');
 let html = fs.readFileSync(file, 'utf8');
-const libs = ['lib/unit-input.cjs', 'lib/stroke-font.cjs', 'lib/laser-setup.cjs', 'lib/offsets.cjs', 'lib/laser-tests.cjs'];
+const libs = ['lib/unit-input.cjs', 'lib/stroke-font.cjs', 'lib/laser-setup.cjs', 'lib/offsets.cjs', 'lib/laser-tests.cjs', 'lib/lasers.cjs'];
 let stale = [];
 for (const lib of libs) {
   const begin = `/* BEGIN ${lib} */\n`, end = `/* END ${lib} */`;
