@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Switching between the spindle and the laser, and Go to X0 Y0, lift with ncSender's `$SAFEZ` on ncSender 2.0.228 or Pro 2.0.326 and later, so the lift follows Safe Z as it's set and leaves the units alone. If ncSender refuses it (the machine isn't homed), nothing after it is sent. Older versions get `G21 G53 G0 Z<Safe Z>` as before.
 - More than one laser: a list in Setup (Your lasers) to add, name, edit and remove lasers, and a Laser menu in the sidebar to pick one. Starts with the K60 (455 nm blue diode, 20/40/60 W) and the R2 (1064 nm infrared, 2 W).
 - Each laser keeps its own spindle (M104 Q), power range (S from / to S: 0% stays S0, 1-100% spans the range), offset from the spindle, crosshair offset, focus Z, power modes, module power and air assist outputs. Programs, presets and the Offsets tab use the picked laser.
 - grblHAL holds one offset ($770/$771): the Offsets tab says whose it holds and loads the picked laser's (only with the spindle selected). Programs and Switch to the laser refuse while it holds another laser's offset.

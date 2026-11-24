@@ -725,9 +725,29 @@ function moveOverZero(wcsOrigin, crossOff, laserOff, which) {
 // Z, ncSender's safeZHeight, else 0), since grblHAL's offset move happens at
 // the current height. Never select the laser when it's already selected:
 // offset.c then takes the "switching back" branch and moves by -offset.
-function switchCommands(toLaser, laserNum, safeZMachine) {
+// safeZCommand: this ncSender runs $SAFEZ (safeZVersionOk), which lifts to
+// Safe Z as it's set, in the current units, and is refused unhomed.
+function switchCommands(toLaser, laserNum, safeZMachine, safeZCommand) {
   var z = typeof safeZMachine === 'number' && isFinite(safeZMachine) ? safeZMachine : 0;
-  return ['G21 G53 G0 Z' + ofF3(z), 'M104 Q' + (toLaser ? laserNum : 0)];
+  return [safeZCommand ? '$SAFEZ' : 'G21 G53 G0 Z' + ofF3(z), 'M104 Q' + (toLaser ? laserNum : 0)];
+}
+
+// ncSender's $SAFEZ raises Z to the Safe Z setting, in machine coordinates
+// and in the program's own units. It arrived in ncSender 2.0.228 and
+// ncSender Pro 2.0.326; older versions pass it on to the controller, which
+// rejects it. edition: /api/app-info's; version: the running version
+// (/api/updates/check's currentVersion). When in doubt, the answer is no.
+function safeZVersionOk(edition, version) {
+  var v = String(version || '');
+  if (v === 'dev' || /-dev\b/.test(v)) return true;
+  var m = /^v?(\d+)\.(\d+)\.(\d+)(-.*)?$/.exec(v.trim());
+  if (!m) return false;
+  var min = edition === 'pro' ? [2, 0, 326] : [2, 0, 228];
+  for (var i = 0; i < 3; i++) {
+    var d = Number(m[i + 1]) - min[i];
+    if (d) return d > 0;
+  }
+  return !m[4]; // a beta of the first version that has it may not
 }
 
 // What grblHAL does on a switch, for the tests: the head's new machine
@@ -749,7 +769,8 @@ function simulateSwitch(state, toLaser, off, updateG92) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { laserOffset: laserOffset, crosshairOffset: crosshairOffset, offsetCommands: offsetCommands,
     spindlePointFromCrosshair: spindlePointFromCrosshair, zeroAtCrosshairCommand: zeroAtCrosshairCommand,
-    moveOverZero: moveOverZero, switchCommands: switchCommands, simulateSwitch: simulateSwitch };
+    moveOverZero: moveOverZero, switchCommands: switchCommands, simulateSwitch: simulateSwitch,
+    safeZVersionOk: safeZVersionOk };
 }
 /* END lib/offsets.cjs */
 /* BEGIN lib/laser-tests.cjs */
@@ -1186,7 +1207,8 @@ if (typeof module !== 'undefined' && module.exports) {
   // The laser picked in the sidebar: Setup edits it, Offsets and Tests use it.
   function laser() { return selectedLaser(cfg); }
   function laserById(id) { return cfg.lasers.filter(function(l) { return l.id === id; })[0] || null; }
-  var st = { fw: null, info: null, ncs: {}, ms: {}, capturing: null };
+  var st = { fw: null, info: null, ncs: {}, ms: {}, capturing: null, safeZCommand: false };
+  ncSenderHasSafeZ(BASE_URL).then(function(yes) { st.safeZCommand = yes; });
   var saveTimer = null;
   function save() {
     clearTimeout(saveTimer);
@@ -1232,7 +1254,30 @@ if (typeof module !== 'undefined' && module.exports) {
     var res = await fetch(BASE_URL + '/api/send-command', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command: command, meta: { sourceId: 'client' } }) });
     var body = res.ok ? await res.json().catch(function() { return {}; }) : {};
-    return res.ok && body.status !== 'error' && body.Status !== 'error';
+    // ncSender refuses $SAFEZ (machine not homed) as "skipped", not an
+    // error: what follows the lift mustn't be sent then.
+    var status = body.status || body.Status;
+    if (/^\s*\$SAFEZ\b/i.test(command) && status === 'skipped') {
+      st.refusal = body.reason || body.Reason || 'Safe Z refused';
+      return false;
+    }
+    return res.ok && status !== 'error';
+  }
+  // Resolves true when this ncSender runs $SAFEZ (safeZVersionOk).
+  // /api/app-info (2.0.76 on) names the edition; /api/updates/check reports
+  // the running version even when it can't reach GitHub. Gives up after 5 s.
+  function ncSenderHasSafeZ(base) {
+    var get = function(path) {
+      return fetch((base || '') + path).then(function(r) {
+        if (!r.ok) throw new Error(path + ': ' + r.status);
+        return r.json();
+      });
+    };
+    var check = Promise.all([get('/api/app-info'), get('/api/updates/check')])
+      .then(function(r) { return safeZVersionOk(r[0] && r[0].edition, r[1] && r[1].currentVersion); })
+      .catch(function() { return false; });
+    var late = new Promise(function(resolve) { setTimeout(function() { resolve(false); }, 5000); });
+    return Promise.race([check, late]);
   }
   async function ask(command, waitMs) {
     st.capturing = [];
@@ -1307,11 +1352,12 @@ if (typeof module !== 'undefined' && module.exports) {
       if (why) { note.setAttribute('data-state', 'bad'); note.textContent = why; return; }
       btns[0].disabled = true;
       var ok = true, list = build();
+      st.refusal = null;
       box.querySelector('pre').textContent = list.join('\n');
       for (var i = 0; i < list.length && ok; i++) ok = await sendCommand(list[i]);
       if (ok && imperial() && list.some(function(c) { return /^G21\b/.test(c); })) ok = await sendCommand('G20');
       note.setAttribute('data-state', ok ? 'ok' : 'bad');
-      note.textContent = ok ? 'Sent.' : 'ncSender didn’t take it.';
+      note.textContent = ok ? 'Sent.' : 'ncSender didn’t take it' + (st.refusal ? ' (' + st.refusal + ')' : '') + '.';
       setTimeout(function() { if (ok) holder.innerHTML = ''; if (done) done(ok); }, ok ? 700 : 0);
     });
     holder.appendChild(box);
@@ -1643,7 +1689,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (w.origin.x == null) { holder.innerHTML = '<p class="lt-note" data-state="bad">ncSender didn’t say where X0 Y0 is.</p>'; return; }
     var L = laser();
     if (which === 'crosshair' && !L.crossOff) { holder.innerHTML = '<p class="lt-note" data-state="warn">Measure the crosshair first.</p>'; return; }
-    var z = switchCommands(false, 0, st.safeZ)[0];
+    var z = switchCommands(false, 0, st.safeZ, st.safeZCommand)[0];
     confirmSend(holder, (which === 'spindle' ? 'The spindle\u2019s tip' : which === 'laser' ? 'The ' + L.name : 'The ' + L.name + '\u2019s crosshair') + ' over X0 Y0 (at Safe Z; jog down to look):',
       [z, moveOverZero(w.origin, L.crossOff || { x: 0, y: 0 }, laserOff(), which)], null, strayCheck);
   }
@@ -1657,7 +1703,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (st.switching) { holder.innerHTML = '<p class="lt-note">Waiting for the last switch to show\u2026</p>'; return; }
     if (toLaser && offsetState(L, st.info.offset) === 'other') { holder.innerHTML = '<p class="lt-note" data-state="warn">grblHAL holds another laser\u2019s offset: load the ' + L.name + '\u2019s first (above), with the spindle selected.</p>'; return; }
     confirmSend(holder, toLaser ? 'Switch to the ' + L.name + ' (grblHAL moves the head by the offset):' : 'Switch to the spindle (grblHAL moves the head back):',
-      switchCommands(toLaser, sp.num, st.safeZ), function(ok) {
+      switchCommands(toLaser, sp.num, st.safeZ, st.safeZCommand), function(ok) {
         if (!ok) return;
         st.switching = true;
         setTimeout(function() { readAll().then(function() { st.switching = false; renderOffsets(); }); }, 1500);

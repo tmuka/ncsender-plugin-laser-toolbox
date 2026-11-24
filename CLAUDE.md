@@ -20,7 +20,7 @@ tests. `docs/PLAN.md` is the plan; README.md the user guide. GPL-3.0.
 `offset.c`: on selecting a non-default, laser-capable spindle when the laser isn't selected, the head rapids by
 +($770, $771) at the current Z; any selection while the laser is selected (even the laser again) rapids it back by
 −offset; with `$772=1` the same amounts go into G92. Nothing happens with a zero offset. So: offset = MPos(laser over a
-mark) − MPos(spindle over it); go to Safe Z before switching; programs never send `M104`.
+mark) − MPos(spindle over it); go to Safe Z before switching (`$SAFEZ` where `safeZVersionOk` says ncSender has it: 2.0.228 on, Pro 2.0.326 on; `sendCommand` takes its "skipped" refusal as a failure); programs never send `M104`.
 
 ## Testing
 

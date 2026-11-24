@@ -64,6 +64,25 @@ test('moves over work zero for the spindle, the laser and the crosshair', () => 
 test('switch commands go to Safe Z first', () => {
   assert.deepStrictEqual(O.switchCommands(true, 1, -5), ['G21 G53 G0 Z-5.000', 'M104 Q1']);
   assert.deepStrictEqual(O.switchCommands(false, 1, null), ['G21 G53 G0 Z0.000', 'M104 Q0']);
+  assert.deepStrictEqual(O.switchCommands(true, 1, -5, false), ['G21 G53 G0 Z-5.000', 'M104 Q1']);
+});
+test('switch commands lift with $SAFEZ where ncSender knows it (its units are the current ones, so no G21)', () => {
+  assert.deepStrictEqual(O.switchCommands(true, 2, -5, true), ['$SAFEZ', 'M104 Q2']);
+  assert.deepStrictEqual(O.switchCommands(false, 2, null, true), ['$SAFEZ', 'M104 Q0']);
+});
+test('safeZVersionOk: ncSender 2.0.228 on, Pro 2.0.326 on, dev builds; else no', () => {
+  const ok = O.safeZVersionOk;
+  assert.strictEqual(ok('community', '2.0.227'), false);
+  assert.strictEqual(ok('community', '2.0.228'), true);
+  assert.strictEqual(ok(undefined, '2.0.230'), true);
+  assert.strictEqual(ok('pro', '2.0.325'), false);
+  assert.strictEqual(ok('pro', '2.0.326'), true);
+  assert.strictEqual(ok('pro', 'v2.0.329'), true);
+  assert.strictEqual(ok('pro', '2.0.326-beta.1'), false);
+  assert.strictEqual(ok('community', '2.0.100-dev'), true);
+  assert.strictEqual(ok('community', 'dev'), true);
+  assert.strictEqual(ok('community', 'garbage'), false);
+  assert.strictEqual(ok('community', null), false);
 });
 test('every motion command the dialog sends is in mm (G21), whatever ncSender left the controller in', () => {
   for (const c of [O.zeroAtCrosshairCommand({ x: 1, y: 1 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 1), O.moveOverZero({ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 'laser'), O.switchCommands(true, 1, -5)[0]]) assert.match(c, /^G21 /);
